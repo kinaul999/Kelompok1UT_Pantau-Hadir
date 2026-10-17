@@ -16,7 +16,7 @@
 
   /* Colors — Design System */
   --color-primary: #080264;
-  --color-secondary: #5d2deb;
+  --color-secondary: #b2c0e3;
   --color-accent: #f58220;
   --color-muted: #7b637b;
   --color-error: #e22121;
@@ -287,6 +287,15 @@ p {
   padding: 0;
   border-radius: var(--radius-md);
 }
+
+.btn-primary img {
+  filter: brightness(0) invert(1);
+}
+
+.btn-secondary img {
+  filter: none;
+}
+
 
 /* -----------------------------------------------------------------------------
    5. FORM CONTROLS

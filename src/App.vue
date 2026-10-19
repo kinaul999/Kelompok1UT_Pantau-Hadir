@@ -68,6 +68,7 @@ const navigateTo = (screenName) => {
       v-if="currentScreen === 'rekapitulasiabsen'"
       @admin-dashboard-trigger="navigateTo('admindashboard')"
       @admin-logout-trigger="navigateTo('landing')"
+      @data-pekerja-trigger="navigateTo('datapekerja')"
     />
 
     <!-- 8. HALAMAN DATA PEKERJA -->

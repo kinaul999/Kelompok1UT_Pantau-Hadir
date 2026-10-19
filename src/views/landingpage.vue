@@ -1,7 +1,17 @@
 <script setup>
 import logo from '../assets/images/logo-pantau-hadir.svg'
-import adminIcon from '../assets/icons/hard-hat.svg'
-import workerIcon from '../assets/icons/monitor-speaker.svg'
+import adminIcon from '../assets/icons/monitor-speaker.svg'
+import workerIcon from '../assets/icons/hard-hat.svg'
+
+const emit = defineEmits(['select-admin', 'select-pekerja'])
+
+const handleAdminClick = () => {
+  emit('select-admin')
+}
+
+const handlePekerjaClick = () => {
+  emit('select-pekerja')
+}
 </script>
 
 <template>
@@ -25,16 +35,24 @@ import workerIcon from '../assets/icons/monitor-speaker.svg'
         <nav aria-label="Pilih jenis pengguna">
           <ul class="role-options">
             <li>
-              <a href="admin-login.html" class="role-card role-option">
+              <button 
+                type="button" 
+                @click="handleAdminClick" 
+                class="role-card role-option w-full"
+              >
                 <img :src="adminIcon" alt="" aria-hidden="true">
                 <span>Masuk sebagai Admin</span>
-              </a>
+              </button>
             </li>
             <li>
-              <a href="pekerja-login.html" class="role-card role-option">
+              <button 
+                type="button" 
+                @click="handlePekerjaClick" 
+                class="role-card role-option w-full"
+              >
                 <img :src="workerIcon" alt="" aria-hidden="true">
                 <span>Masuk sebagai Pekerja</span>
-              </a>
+              </button>
             </li>
           </ul>
         </nav>

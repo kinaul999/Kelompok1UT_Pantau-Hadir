@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rekapitulasi Absensi | Pantau Hadir</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(rgba(13, 71, 161, 0.45), rgba(15, 23, 42, 0.6)), 
+                        url('konstruksi_biru.png') no-repeat center center fixed;
+            background-size: cover;
+            color: #1e293b;
+        }
+
+        /* =========================
+           SIDEBAR
+        ========================= */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 250px;
+            height: 100vh;
+            background: rgba(13, 71, 161, 0.85);
+            backdrop-filter: blur(12px);
+            color: white;
+            padding: 25px 18px;
+            z-index: 1000;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0 10px 30px;
+            border-bottom: 1px solid rgba(255,255,255,0.15);
+        }
+
+        .logo-text h2 {
+            font-size: 19px;
+        }
+
+        .logo-text span {
+            font-size: 11px;
+            opacity: 0.8;
+        }
+
+        .menu {
+            margin-top: 30px;
+        }
+
+        .menu-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            opacity: 0.6;
+            margin: 0 12px 12px;
+        }
+
+        .menu a {
+            display: flex;
+            align-items: center;
+            gap: 13px;
+            color: white;
+            text-decoration: none;
+            padding: 13px 14px;
+            margin-bottom: 6px;
+            border-radius: 9px;
+            font-size: 14px;
+            transition: 0.2s;
+        }
+
+        .menu a:hover,
+        .menu a.active {
+            background: rgba(255,255,255,0.15);
+        }
+
+        .menu-icon {
+            width: 23px;
+            text-align: center;
+        }
+
+        /* =========================
+           MAIN
+        ========================= */
+        .main {
+            margin-left: 250px;
+            min-height: 100vh;
+        }
+
+        /* =========================
+           TOPBAR
+        ========================= */
+        .topbar {
+            height: 75px;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid rgba(229, 231, 235, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 35px;
+        }
+
+        .page-title h1 {
+            font-size: 22px;
+            color: #172033;
+        }
+
+        .page-title p {
+            margin-top: 4px;
+            color: #64748b;
+            font-size: 12px;
+        }
+
+        .admin-profile {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .admin-avatar {
+            width: 40px;
+            height: 40px;
+            background: #e3f2fd;
+            color: #1565c0;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .admin-info strong {
+            display: block;
+            font-size: 13px;
+        }
+
+        .admin-info span {
+            font-size: 11px;
+            color: #64748b;
+        }
+
+        /* =========================
+           CONTENT
+        ========================= */
+        .content {
+            padding: 30px 35px;
+        }
+
+        .breadcrumb {
+            font-size: 13px;
+            color: #64748b;
+            margin-bottom: 22px;
+        }
+
+        .breadcrumb span {
+            color: #1565c0;
+            font-weight: 600;
+        }
+
+        /* =========================
+           STATISTICS
+        ========================= */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 18px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(8px);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .stat-info p {
+            color: #64748b;
+            font-size: 12px;
+            margin-bottom: 7px;
+        }
+
+        .stat-info h2 {
+            font-size: 27px;
+            color: #172033;
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 21px;
+        }
+
+        .blue { background: #e3f2fd; color: #1565c0; }
+        .green { background: #dcfce7; color: #15803d; }
+        .orange { background: #ffedd5; color: #c2410c; }
+        .red { background: #fee2e2; color: #dc2626; }
+
+        /* =========================
+           TABLE CONTAINER
+        ========================= */
+        .table-container {
+            background: rgba(255, 255, 255, 0.88);
+            backdrop-filter: blur(10px);
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            overflow: hidden;
+        }
+
+        .table-header {
+            padding: 22px 24px;
+            border-bottom: 1px solid #edf0f4;
+        }
+
+        .table-header-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 18px;
+        }
+
+        .table-header h2 {
+            font-size: 17px;
+            color: #172033;
+        }
+
+        .table-header p {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 5px;
+        }
+
+        /* =========================
+           FILTER
+        ========================= */
+        .filters {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            position: relative;
+            flex: 1;
+            min-width: 220px;
+        }
+
+        .search-box input {
+            width: 100%;
+            height: 42px;
+            border: 1px solid #d8dee9;
+            border-radius: 8px;
+            padding: 0 15px 0 38px;
+            outline: none;
+            font-size: 13px;
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .search-box input:focus {
+            border-color: #1976d2;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 13px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #94a3b8;
+        }
+
+        .filter-select,
+        .date-input {
+            height: 42px;
+            border: 1px solid #d8dee9;
+            border-radius: 8px;
+            padding: 0 12px;
+            color: #475569;
+            background: rgba(255, 255, 255, 0.9);
+            outline: none;
+            font-size: 13px;
+        }
+
+        .filter-select:focus,
+        .date-input:focus {
+            border-color: #1976d2;
+        }
+
+        .export-button {
+            height: 42px;
+            border: none;
+            background: #1565c0;
+            color: white;
+            padding: 0 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: 0.2s;
+        }
+
+        .export-button:hover {
+            background: #0d47a1;
+        }
+
+        /* =========================
+           TABLE
+        ========================= */
+        .table-wrapper {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 950px;
+        }
+
+        thead {
+            background: rgba(248, 250, 252, 0.8);
+        }
+
+        th {
+            padding: 14px 15px;
+            text-align: left;
+            font-size: 11px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 15px;
+            border-top: 1px solid #edf0f4;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+        tbody tr:hover {
+            background: rgba(21, 101, 192, 0.08);
+        }
+
+        .number {
+            color: #64748b;
+            width: 50px;
+        }
+
+        .employee {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .employee-avatar {
+            width: 34px;
+            height: 34px;
+            background: #e3f2fd;
+            color: #1565c0;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .employee-name {
+            font-weight: 600;
+            color: #334155;
+        }
+
+        .date {
+            color: #475569;
+        }
+
+        .time {
+            font-weight: 600;
+            color: #334155;
+        }
+
+        .empty-time {
+            color: #94a3b8;
+        }
+
+        /* =========================
+           STATUS
+        ========================= */
+        .status {
+            display: inline-flex;
+            align-items: center;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .status-hadir { background: #dcfce7; color: #15803d; }
+        .status-terlambat { background: #ffedd5; color: #c2410c; }
+        .status-izin { background: #fef3c7; color: #a16207; }
+        .status-sakit { background: #fee2e2; color: #dc2626; }
+
+        /* =========================
+           FOTO BUTTON
+        ========================= */
+        .photo-button {
+            border: 1px solid #bfdbfe;
+            background: #eff6ff;
+            color: #1565c0;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+            transition: 0.2s;
+        }
+
+        .photo-button:hover {
+            background: #dbeafe;
+        }
+
+        /* =========================
+           FOOTER
+        ========================= */
+        .table-footer {
+            padding: 17px 24px;
+            border-top: 1px solid #edf0f4;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #64748b;
+            font-size: 12px;
+        }
+
+        /* =========================
+           MODAL FOTO
+        ========================= */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-card {
+            background: white;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 420px;
+            padding: 24px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .modal-header h3 {
+            font-size: 16px;
+            color: #1e293b;
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #64748b;
+        }
+
+        .modal-body {
+            text-align: center;
+        }
+
+        .photo-preview {
+            width: 100%;
+            height: 220px;
+            background: #f1f5f9;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 2px dashed #cbd5e1;
+            margin-bottom: 15px;
+        }
+
+        .photo-preview span {
+            font-size: 40px;
+            margin-bottom: 8px;
+        }
+
+        .photo-preview p {
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        .modal-info {
+            text-align: left;
+            background: #f8fafc;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 12px;
+        }
+
+        .modal-info div {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+
+        .modal-info div:last-child {
+            margin-bottom: 0;
+        }
+
+        /* =========================
+           RESPONSIVE MEDIA QUERIES
+        ========================= */
+        @media (max-width: 1000px) {
+            .stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 70px;
+                padding: 20px 10px;
+            }
+
+            .logo-text,
+            .menu-title,
+            .menu a span {
+                display: none;
+            }
+
+            .logo {
+                justify-content: center;
+                padding: 0 0 25px;
+            }
+
+            .menu a {
+                justify-content: center;
+                padding: 13px 5px;
+            }
+
+            .main {
+                margin-left: 70px;
+            }
+
+            .topbar {
+                padding: 0 20px;
+            }
+
+            .content {
+                padding: 20px;
+            }
+
+            .admin-info {
+                display: none;
+            }
+
+            .table-header-top {
+                align-items: flex-start;
+                gap: 15px;
+                flex-direction: column;
+            }
+        }
+
+        @media (max-width: 550px) {
+            .stats {
+                grid-template-columns: 1fr;
+            }
+
+            .filters {
+                flex-direction: column;
+            }
+
+            .search-box,
+            .filter-select,
+            .date-input,
+            .export-button {
+                width: 100%;
+            }
+
+            .page-title h1 {
+                font-size: 18px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="logo">
+            <img src="logo_pantau_hadir.png" alt="Logo Pantau Hadir" style="width: 45px; height: 45px; object-fit: contain; border-radius: 8px; background: white; padding: 2px;">
+            <div class="logo-text">
+                <h2>Pantau Hadir</h2>
+                <span>Admin System</span>
+            </div>
+        </div>
+
+        <nav class="menu">
+            <div class="menu-title">Menu Utama</div>
+            <a href="dashboard.html">
+                <div class="menu-icon">▦</div>
+                <span>Dashboard</span>
+            </a>
+            <a href="pekerja.html">
+                <div class="menu-icon">👥</div>
+                <span>Data Pekerja</span>
+            </a>
+            <a href="proyek.html">
+                <div class="menu-icon">🏗</div>
+                <span>Data Proyek</span>
+            </a>
+            <a href="absensi.html">
+                <div class="menu-icon">✓</div>
+                <span>Absensi</span>
+            </a>
+            <a href="rekapitulasiabsen.html" class="active">
+                <div class="menu-icon">▤</div>
+                <span>Rekapitulasi</span>
+            </a>
+            <a href="laporan.html">
+                <div class="menu-icon">▥</div>
+                <span>Laporan</span>
+            </a>
+
+            <br>
+            <div class="menu-title">Pengaturan</div>
+            <a href="pengaturan.html">
+                <div class="menu-icon">⚙</div>
+                <span>Pengaturan</span>
+            </a>
+            <a href="loginweb.html">
+                <div class="menu-icon">⇥</div>
+                <span>Keluar</span>
+            </a>
+        </nav>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main">
+        <!-- TOPBAR -->
+        <header class="topbar">
+            <div class="page-title">
+                <h1>Rekapitulasi Absensi</h1>
+                <p>Pantau Hadir / Rekapitulasi Absensi</p>
+            </div>
+            <div class="admin-profile">
+                <div class="admin-avatar">AD</div>
+                <div class="admin-info">
+                    <strong>Administrator</strong>
+                    <span>Admin</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- CONTENT AREA -->
+        <section class="content">
+            <div class="breadcrumb">
+                Dashboard / <span>Rekapitulasi Absensi</span>
+            </div>
+
+            <!-- STATISTIK CARDS -->
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <p>Total Pekerja</p>
+                        <h2 id="statTotal">20</h2>
+                    </div>
+                    <div class="stat-icon blue">👥</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <p>Hadir</p>
+                        <h2 id="statHadir">15</h2>
+                    </div>
+                    <div class="stat-icon green">✓</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <p>Terlambat</p>
+                        <h2 id="statTerlambat">2</h2>
+                    </div>
+                    <div class="stat-icon orange">⏱</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <p>Izin / Sakit</p>
+                        <h2 id="statAbsen">3</h2>
+                    </div>
+                    <div class="stat-icon red">!</div>
+                </div>
+            </div>
+
+            <!-- TABLE CONTAINER -->
+            <div class="table-container">
+                <div class="table-header">
+                    <div class="table-header-top">
+                        <div>
+                            <h2>Data Rekapitulasi Kehadiran</h2>
+                            <p id="tableSubtext">Data presensi pekerja proyek tanggal 25 September 2026</p>
+                        </div>
+                    </div>
+
+                    <!-- FILTERS -->
+                    <div class="filters">
+                        <div class="search-box">
+                            <span class="search-icon">🔍</span>
+                            <input type="text" id="searchInput" placeholder="Cari nama pekerja...">
+                        </div>
+
+                        <select id="statusFilter" class="filter-select">
+                            <option value="Semua">Semua Status</option>
+                            <option value="Hadir">Hadir</option>
+                            <option value="Terlambat">Terlambat</option>
+                            <option value="Izin">Izin</option>
+                            <option value="Sakit">Sakit</option>
+                        </select>
+
+                        <input type="date" id="dateFilter" class="date-input" value="2026-09-25">
+
+                        <button class="export-button" onclick="exportCSV()">↓ Export CSV</button>
+                    </div>
+                </div>
+
+                <!-- TABLE -->
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>No</th>
+                                <th>Nama Pekerja</th>
+                                <th>Tanggal</th>
+                                <th>Jam Masuk</th>
+                                <th>Bukti Masuk</th>
+                                <th>Jam Pulang</th>
+                                <th>Bukti Pulang</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceTable">
+                            <!-- Populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- FOOTER -->
+                <div class="table-footer">
+                    <div id="showingText">Menampilkan 20 data</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- MODAL POPUP BUKTI FOTO -->
+    <div class="modal-overlay" id="photoModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modalTitle">Bukti Foto Presensi</h3>
+                <button class="close-modal" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="photo-preview">
+                    <span>📷</span>
+                    <p id="modalPhotoType">Foto Presensi Berhasil Diunggah</p>
+                </div>
+                <div class="modal-info">
+                    <div>
+                        <span style="color:#64748b;">Nama Pekerja:</span>
+                        <strong id="modalName">-</strong>
+                    </div>
+                    <div>
+                        <span style="color:#64748b;">Jenis Presensi:</span>
+                        <strong id="modalType">-</strong>
+                    </div>
+                    <div>
+                        <span style="color:#64748b;">Waktu:</span>
+                        <strong id="modalTime">-</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        /* =====================================
+           1. CEK LOGIN (SESSION CHECK)
+        ===================================== */
+        document.addEventListener("DOMContentLoaded", function() {
+            const isLoggedIn = localStorage.getItem("statusLogin");
+            if (isLoggedIn !== "true") {
+                alert("Silakan login terlebih dahulu!");
+                window.location.href = "loginweb.html"; 
+                return;
+            }
+            renderTable(attendanceData);
+        });
+
+        /* =====================================
+           2. DATA PRESENSI (20 ENTRI)
+        ===================================== */
+        const attendanceData = [
+            { no: 1, nama: "Bambang Cahyadi", tanggal: "25 Sep 2026", jamMasuk: "07:31:20", buktiMasuk: true, jamPulang: "16:31:29", buktiPulang: true, status: "Hadir" },
+            { no: 2, nama: "Ahmad Supriyadi", tanggal: "25 Sep 2026", jamMasuk: "07:15:04", buktiMasuk: true, jamPulang: "16:05:12", buktiPulang: true, status: "Hadir" },
+            { no: 3, nama: "Dedi Rahmadi", tanggal: "25 Sep 2026", jamMasuk: "07:28:45", buktiMasuk: true, jamPulang: "16:15:50", buktiPulang: true, status: "Hadir" },
+            { no: 4, nama: "Budi Santoso", tanggal: "25 Sep 2026", jamMasuk: "07:42:10", buktiMasuk: true, jamPulang: "16:45:01", buktiPulang: true, status: "Hadir" },
+            { no: 5, nama: "Suryo Nugroho", tanggal: "25 Sep 2026", jamMasuk: "08:05:33", buktiMasuk: true, jamPulang: "17:02:18", buktiPulang: true, status: "Terlambat" },
+            { no: 6, nama: "Eko Prasetyo", tanggal: "25 Sep 2026", jamMasuk: "07:20:11", buktiMasuk: true, jamPulang: "16:10:40", buktiPulang: true, status: "Hadir" },
+            { no: 7, nama: "Reza Kurniawan", tanggal: "25 Sep 2026", jamMasuk: "-", buktiMasuk: false, jamPulang: "-", buktiPulang: false, status: "Izin" },
+            { no: 8, nama: "Hendra Wijaya", tanggal: "25 Sep 2026", jamMasuk: "07:35:50", buktiMasuk: true, jamPulang: "16:35:10", buktiPulang: true, status: "Hadir" },
+            { no: 9, nama: "Muhammad Agung", tanggal: "25 Sep 2026", jamMasuk: "07:18:22", buktiMasuk: true, jamPulang: "16:08:44", buktiPulang: true, status: "Hadir" },
+            { no: 10, nama: "Rizky Ramadhan", tanggal: "25 Sep 2026", jamMasuk: "-", buktiMasuk: false, jamPulang: "-", buktiPulang: false, status: "Sakit" },
+            { no: 11, nama: "Agus Setiawan", tanggal: "25 Sep 2026", jamMasuk: "07:25:14", buktiMasuk: true, jamPulang: "16:20:05", buktiPulang: true, status: "Hadir" },
+            { no: 12, nama: "Fajar Hidayat", tanggal: "25 Sep 2026", jamMasuk: "07:11:40", buktiMasuk: true, jamPulang: "16:02:19", buktiPulang: true, status: "Hadir" },
+            { no: 13, nama: "Gilang Gemilang", tanggal: "25 Sep 2026", jamMasuk: "08:12:05", buktiMasuk: true, jamPulang: "17:10:42", buktiPulang: true, status: "Terlambat" },
+            { no: 14, nama: "Hadi Pratama", tanggal: "25 Sep 2026", jamMasuk: "07:30:00", buktiMasuk: true, jamPulang: "16:30:15", buktiPulang: true, status: "Hadir" },
+            { no: 15, nama: "Indra Lesmana", tanggal: "25 Sep 2026", jamMasuk: "07:40:18", buktiMasuk: true, jamPulang: "16:40:55", buktiPulang: true, status: "Hadir" },
+            { no: 16, nama: "Joko Susilo", tanggal: "25 Sep 2026", jamMasuk: "07:22:31", buktiMasuk: true, jamPulang: "16:12:08", buktiPulang: true, status: "Hadir" },
+            { no: 17, nama: "Kiki Hermawan", tanggal: "25 Sep 2026", jamMasuk: "-", buktiMasuk: false, jamPulang: "-", buktiPulang: false, status: "Izin" },
+            { no: 18, nama: "Lukman Hakim", tanggal: "25 Sep 2026", jamMasuk: "07:29:10", buktiMasuk: true, jamPulang: "16:25:30", buktiPulang: true, status: "Hadir" },
+            { no: 19, nama: "Mulyadi", tanggal: "25 Sep 2026", jamMasuk: "07:14:52", buktiMasuk: true, jamPulang: "16:01:45", buktiPulang: true, status: "Hadir" },
+            { no: 20, nama: "Novan Saputra", tanggal: "25 Sep 2026", jamMasuk: "07:38:04", buktiMasuk: true, jamPulang: "16:38:12", buktiPulang: true, status: "Hadir" }
+        ];
+
+        /* =====================================
+           3. ELEMEN & FUNGSI RENDER TABEL
+        ===================================== */
+        const tableBody = document.getElementById("attendanceTable");
+        const searchInput = document.getElementById("searchInput");
+        const statusFilter = document.getElementById("statusFilter");
+        const showingText = document.getElementById("showingText");
+
+        function getInitials(name) {
+            const words = name.split(" ");
+            if (words.length >= 2) {
+                return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase();
+            }
+            return name.substring(0, 2).toUpperCase();
+        }
+
+        function getStatusClass(status) {
+            switch(status) {
+                case "Hadir": return "status-hadir";
+                case "Terlambat": return "status-terlambat";
+                case "Izin": return "status-izin";
+                case "Sakit": return "status-sakit";
+                default: return "";
+            }
+        }
+
+        function updateStatistics(data) {
+            const total = data.length;
+            const hadir = data.filter(d => d.status === "Hadir").length;
+            const terlambat = data.filter(d => d.status === "Terlambat").length;
+            const absen = data.filter(d => d.status === "Izin" || d.status === "Sakit").length;
+
+            document.getElementById("statTotal").textContent = total;
+            document.getElementById("statHadir").textContent = hadir;
+            document.getElementById("statTerlambat").textContent = terlambat;
+            document.getElementById("statAbsen").textContent = absen;
+        }
+
+        function renderTable(data) {
+            tableBody.innerHTML = "";
+
+            if (data.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="8" style="text-align: center; padding: 30px; color: #94a3b8;">
+                            Tidak ada data presensi yang ditemukan.
+                        </td>
+                    </tr>
+                `;
+                showingText.textContent = "Menampilkan 0 data";
+                return;
+            }
+
+            data.forEach((item, index) => {
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td class="number">${index + 1}</td>
+                    <td>
+                        <div class="employee">
+                            <div class="employee-avatar">${getInitials(item.nama)}</div>
+                            <div class="employee-name">${item.nama}</div>
+                        </div>
+                    </td>
+                    <td class="date">${item.tanggal}</td>
+                    <td>
+                        ${item.jamMasuk === "-" ? `<span class="empty-time">-</span>` : `<span class="time">${item.jamMasuk}</span>`}
+                    </td>
+                    <td>
+                        ${item.buktiMasuk ? `<button class="photo-button" onclick="viewPhoto('${item.nama}', 'Masuk', '${item.jamMasuk}')">📷 Foto</button>` : `<span class="empty-time">-</span>`}
+                    </td>
+                    <td>
+                        ${item.jamPulang === "-" ? `<span class="empty-time">-</span>` : `<span class="time">${item.jamPulang}</span>`}
+                    </td>
+                    <td>
+                        ${item.buktiPulang ? `<button class="photo-button" onclick="viewPhoto('${item.nama}', 'Pulang', '${item.jamPulang}')">📷 Foto</button>` : `<span class="empty-time">-</span>`}
+                    </td>
+                    <td>
+                        <span class="status ${getStatusClass(item.status)}">${item.status}</span>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+
+            showingText.textContent = `Menampilkan ${data.length} data`;
+            updateStatistics(data);
+        }
+
+        function filterData() {
+            const keyword = searchInput.value.toLowerCase();
+            const status = statusFilter.value;
+
+            const filtered = attendanceData.filter(item => {
+                const matchName = item.nama.toLowerCase().includes(keyword);
+                const matchStatus = status === "Semua" || item.status === status;
+                return matchName && matchStatus;
+            });
+
+            renderTable(filtered);
+        }
+
+        searchInput.addEventListener("input", filterData);
+        statusFilter.addEventListener("change", filterData);
+
+        function viewPhoto(nama, jenis, waktu) {
+            document.getElementById("modalName").textContent = nama;
+            document.getElementById("modalType").textContent = `Presensi ${jenis}`;
+            document.getElementById("modalTime").textContent = waktu;
+            document.getElementById("modalPhotoType").textContent = `Foto Bukti Presensi ${jenis} Terverifikasi`;
+            document.getElementById("photoModal").classList.add("active");
+        }
+
+        function closeModal() {
+            document.getElementById("photoModal").classList.remove("active");
+        }
+
+        function exportCSV() {
+            let csv = "No,Nama Pekerja,Tanggal,Jam Masuk,Bukti Masuk,Jam Pulang,Bukti Pulang,Status\n";
+
+            attendanceData.forEach((item) => {
+                csv += `${item.no},"${item.nama}",${item.tanggal},${item.jamMasuk},${item.buktiMasuk ? "Foto" : "-"},${item.jamPulang},${item.buktiPulang ? "Foto" : "-"},${item.status}\n`;
+            });
+
+            const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = "rekapitulasi-absensi.csv";
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>

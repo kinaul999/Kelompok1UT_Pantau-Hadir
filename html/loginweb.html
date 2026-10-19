@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Admin | Pantau Hadir</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        body {
+    min-height: 100vh;
+    background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url('image_login.png') center/cover no-repeat fixed;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #1e293b;
+}
+
+        .login-container {
+            width: 100%;
+            max-width: 1050px;
+            min-height: 620px;
+            background: #ffffff;
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 15px 45px rgba(0, 0, 0, 0.10);
+            display: flex;
+        }
+
+        /* BAGIAN KIRI */
+        .login-left {
+    width: 48%;
+    background: linear-gradient(rgba(13, 71, 161, 0.75), rgba(25, 118, 210, 0.75)), url('image_login_2.jpg') center/cover no-repeat;
+    color: white;
+    padding: 55px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+        .login-left::before {
+            content: "";
+            position: absolute;
+            width: 280px;
+            height: 280px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.08);
+            top: -100px;
+            right: -80px;
+        }
+
+        .login-left::after {
+            content: "";
+            position: absolute;
+            width: 220px;
+            height: 220px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.07);
+            bottom: -80px;
+            left: -70px;
+        }
+
+        .brand {
+            position: relative;
+            z-index: 2;
+            margin-bottom: 35px;
+        }
+
+        .brand-icon {
+            width: 65px;
+            height: 65px;
+            background: white;
+            color: #1565c0;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .brand h1 {
+            font-size: 34px;
+            margin-bottom: 10px;
+        }
+
+        .brand p {
+            font-size: 15px;
+            line-height: 1.7;
+            opacity: 0.9;
+            max-width: 360px;
+        }
+
+        .features {
+            position: relative;
+            z-index: 2;
+            margin-top: 20px;
+        }
+
+        .feature {
+            display: flex;
+            align-items: center;
+            margin-bottom: 18px;
+            font-size: 14px;
+        }
+
+        .feature-icon {
+            width: 38px;
+            height: 38px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            font-size: 17px;
+        }
+
+        /* BAGIAN KANAN */
+        .login-right {
+            width: 52%;
+            padding: 55px 65px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .login-header {
+            margin-bottom: 32px;
+        }
+
+        .login-header h2 {
+            font-size: 28px;
+            color: #172033;
+            margin-bottom: 8px;
+        }
+
+        .login-header p {
+            font-size: 14px;
+            color: #64748b;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #334155;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-wrapper input {
+            width: 100%;
+            height: 50px;
+            padding: 0 45px 0 45px;
+            border: 1px solid #d8dee9;
+            border-radius: 10px;
+            outline: none;
+            font-size: 14px;
+            transition: 0.3s;
+            background: #fff;
+        }
+
+        .input-wrapper input:focus {
+            border-color: #1976d2;
+            box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.10);
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #94a3b8;
+            font-size: 17px;
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            color: #64748b;
+            font-size: 16px;
+        }
+
+        .password-toggle:hover {
+            color: #1976d2;
+        }
+
+        .form-options {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            font-size: 13px;
+        }
+
+        .remember {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            color: #64748b;
+        }
+
+        .remember input {
+            width: 15px;
+            height: 15px;
+            accent-color: #1976d2;
+            cursor: pointer;
+        }
+
+        .forgot-password {
+            color: #1976d2;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .forgot-password:hover {
+            text-decoration: underline;
+        }
+
+        .login-button {
+            width: 100%;
+            height: 50px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #1565c0, #1976d2);
+            color: white;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .login-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(25, 118, 210, 0.25);
+        }
+
+        .login-footer {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 12px;
+            color: #94a3b8;
+        }
+
+        .error-message {
+            display: none;
+            background: #fee2e2;
+            color: #b91c1c;
+            border: 1px solid #fecaca;
+            padding: 11px 13px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 18px;
+        }
+
+        .success-message {
+            display: none;
+            background: #dcfce7;
+            color: #15803d;
+            border: 1px solid #bbf7d0;
+            padding: 11px 13px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 18px;
+        }
+
+        /* RESPONSIVE DESIGN */
+        @media (max-width: 850px) {
+            .login-container {
+                max-width: 500px;
+                min-height: auto;
+            }
+            .login-left {
+                display: none;
+            }
+            .login-right {
+                width: 100%;
+                padding: 45px 40px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 15px;
+            }
+            .login-right {
+                padding: 35px 25px;
+            }
+            .login-header h2 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-container">
+        <!-- BAGIAN KIRI (INFORMASI APLIKASI) -->
+        <div class="login-left">
+            <div class="brand">
+
+    <img src="logo_pantau_hadir.png" alt="Logo Pantau Hadir" style="max-width: 180px; height: auto; margin-bottom: 20px; background: white; padding: 10px; border-radius: 12px;">
+
+    <h1>Pantau Hadir</h1>
+                <p>
+                    Sistem informasi absensi pekerja proyek yang membantu perusahaan memantau kehadiran secara mudah, cepat, dan terintegrasi.
+                </p>
+            </div>
+            <div class="features">
+                <div class="feature">
+                    <div class="feature-icon">✓</div>
+                    <span>Monitoring kehadiran pekerja</span>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">⌖</div>
+                    <span>Pemantauan lokasi proyek</span>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">▣</div>
+                    <span>Laporan absensi terintegrasi</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- BAGIAN KANAN (FORM LOGIN) -->
+        <div class="login-right">
+            <div class="login-header">
+                <h2>Login Admin</h2>
+                <p>Silakan masuk untuk mengelola data absensi.</p>
+            </div>
+
+            <!-- Pesan error dan sukses -->
+            <div class="error-message" id="errorMessage">
+                Username atau password yang Anda masukkan salah.
+            </div>
+            <div class="success-message" id="successMessage">
+                Login berhasil! Selamat datang.
+            </div>
+
+            <form id="loginForm">
+                <!-- Username -->
+                <div class="form-group">
+                    <label for="username">Username / Email</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">👤</span>
+                        <input type="text" id="username" placeholder="Masukkan username atau email" autocomplete="username" required>
+                    </div>
+                </div>
+
+                <!-- Password -->
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">🔒</span>
+                        <input type="password" id="password" placeholder="Masukkan password" autocomplete="current-password" required>
+                        <button type="button" class="password-toggle" id="togglePassword">👁</button>
+                    </div>
+                </div>
+
+                <!-- Remember me & Forgot Password -->
+                <div class="form-options">
+                    <label class="remember">
+                        <input type="checkbox" id="remember">
+                        <span>Ingat saya</span>
+                    </label>
+                </div>
+
+                <!-- Tombol Login -->
+                <button type="submit" class="login-button">Masuk</button>
+            </form>
+
+            <div class="login-footer">
+                © 2026 Pantau Hadir App. Semua hak dilindungi.
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT -->
+   <!-- JAVASCRIPT -->
+    <script>
+        const loginForm = document.getElementById("loginForm");
+        const username = document.getElementById("username");
+        const password = document.getElementById("password");
+        const togglePassword = document.getElementById("togglePassword");
+        const errorMessage = document.getElementById("errorMessage");
+        const successMessage = document.getElementById("successMessage");
+
+        // Fitur Lihat/Sembunyikan Password
+        if (togglePassword) {
+            togglePassword.addEventListener("click", function () {
+                if (password.type === "password") {
+                    password.type = "text";
+                    togglePassword.textContent = "🐵";
+                } else {
+                    password.type = "password";
+                    togglePassword.textContent = "👁";
+                }
+            });
+        }
+
+        // Logika Login
+        if (loginForm) {
+            loginForm.addEventListener("submit", function (event) {
+                event.preventDefault();
+
+                errorMessage.style.display = "none";
+                successMessage.style.display = "none";
+
+                // Username & Password Default (bisa disesuaikan)
+                if (username.value === "admin" && password.value === "admin123") {
+                    
+                    successMessage.style.display = "block";
+
+                    // 1. Rekam status login agar bisa masuk ke rekapitulasi absensi
+                    localStorage.setItem("statusLogin", "true");
+
+                    // 2. Beri jeda 1 detik lalu pindah halaman secara otomatis
+                    setTimeout(function () {
+                        window.location.href = "rekapitulasiabsen.html";
+                    }, 1000);
+
+                } else {
+                    // Jika username / password salah
+                    errorMessage.style.display = "block";
+                }
+            });
+        }
+    </script>

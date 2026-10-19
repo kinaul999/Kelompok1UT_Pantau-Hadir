@@ -7,6 +7,8 @@ import checkIcon from '../assets/icons/circle-check.svg'
 import absentIcon from '../assets/icons/circle-x.svg'
 import logoutIcon from '../assets/icons/log-out.svg'
 import usersIcon from '../assets/icons/users.svg'
+import scanFaceIcon from '../assets/icons/scan-face.svg'
+import squarePenIcon from '../assets/icons/square-pen.svg'
 
 const totalWorkers = ref(45)
 const presentWorkers = ref(45)
@@ -56,243 +58,283 @@ const emit = defineEmits([
 </script>
 
 <template>
-  <div class="layout-admin dashboard-shell">
-    <aside class="sidebar dashboard-sidebar">
-      <div class="sidebar-logo dashboard-brand">
-        <img :src="logo" alt="Logo Pantau Hadir">
+    <div class="layout-admin dashboard-shell">
+    <aside class="sidebar admin-sidebar">
+      <div class="sidebar-logo">
+        <img
+          :src="logo"
+          alt="Pantau Hadir - Sistem Absensi Pekerja Proyek"
+          class="brand-logo"
+        />
       </div>
-
-      <nav class="dashboard-nav" aria-label="Navigasi utama">
-        <a href="#dashboard" class="nav-item active is-active" aria-current="page" @click.prevent="emit('admin-dashboard-trigger')">
-          <span class="nav-icon" aria-hidden="true">▦</span>
+  
+      <nav class="sidebar-nav" aria-label="Navigasi Utama Admin">
+        <button type="button" class="nav-item is-active" aria-current="page">
+          <img :src="scanFaceIcon" alt="" width="26" height="26" class="nav-icon" aria-hidden="true" />
           <span>Dashboard</span>
-        </a>
-        <a href="#rekap" class="nav-item" @click.prevent="emit('rekapitulasi-absen-trigger')">
-          <span class="nav-icon" aria-hidden="true">▤</span>
-          <span>Rekapitulasi Absensi</span>
-        </a>
-        <a href="#data-pekerja" class="nav-item" @click.prevent="emit('data-pekerja-trigger')">
-          <span class="nav-icon" aria-hidden="true">♙</span>
+        </button>
+        <button type="button" class="nav-item" @click="emit('rekapitulasi-absen-trigger')">
+          <img :src="squarePenIcon" alt="" width="26" height="26" class="nav-icon" aria-hidden="true" />
+          <span>Rekap Absensi</span>
+        </button>
+        <button type="button" class="nav-item" @click="emit('data-pekerja-trigger')">
+          <img :src="usersIcon" alt="" width="26" height="26" class="nav-icon" aria-hidden="true" />
           <span>Data Pekerja</span>
-        </a>
+        </button>
       </nav>
-
-      <div class="sidebar-footer dashboard-sidebar-footer">
-        <a href="#keluar" class="logout-button" @click.prevent="emit('admin-logout-trigger')">
-          <img :src="logoutIcon" alt="">
+  
+      <div class="sidebar-footer">
+        <button
+          type="button"
+          class="btn-logout"
+          aria-label="Keluar ke halaman landing"
+          @click="emit('admin-logout-trigger')"
+        >
+          <img :src="logoutIcon" alt="" width="18" height="18" aria-hidden="true" />
           <span>Keluar</span>
-        </a>
-        <p class="sidebar-copy dashboard-copyright">
-          © 2026 Pantau Hadir<br>
-          Sistem Absensi Pekerja Proyek
-        </p>
+        </button>
+        <div class="sidebar-copy">
+          <p>© 2026 Pantau Hadir App</p>
+          <small>Sistem Absensi Pekerja Proyek</small>
+        </div>
       </div>
     </aside>
-
-    <main class="main dashboard-main">
-      <header class="topbar">
-        <div class="company-name">PT. Jalan Baru</div>
+  
+    <div class="admin-main-wrap">
+      <header class="app-header">
+        <h2 class="company-title">PT. Jalan Baru</h2>
         <div class="admin-profile">
-          <span>Administrator</span>
-          <div class="profile-avatar">
-            <img :src="usersIcon" alt="Profil administrator">
+          <span class="admin-label">Admin</span>
+          <div class="avatar-circle" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" class="avatar-icon">
+              <path
+                d="M12 12C14.7614 12 17 9.76142 17 7C17 4.23858 14.7614 2 12 2C9.23858 2 7 4.23858 7 7C7 9.76142 9.23858 12 12 12Z"
+                fill="#ffffff"
+              />
+              <path
+                d="M12.0002 14.5C6.99016 14.5 2.91016 17.86 2.91016 22C2.91016 22.28 3.13016 22.5 3.41016 22.5H20.5902C20.8702 22.5 21.0902 22.28 21.0902 22C21.0902 17.86 17.0102 14.5 12.0002 14.5Z"
+                fill="#ffffff"
+              />
+            </svg>
           </div>
         </div>
       </header>
-
-      <section class="dashboard-content">
-        <div class="page-heading">
-          <div>
-            <span class="eyebrow">RINGKASAN AKTIVITAS</span>
-            <h1>Dashboard</h1>
-            <p>Selamat datang kembali, Administrator!</p>
-          </div>
-        </div>
-
-        <div class="datetime-bar" aria-live="off">
-          <div class="date-info">
-            <span class="info-dot" aria-hidden="true"></span>
+  
+      <main class="dashboard-content">
+        <section class="dashboard-content">
+          <div class="page-heading">
             <div>
-              <span class="info-label">Tanggal</span>
-              <strong>{{ dateLabel }}</strong>
+              <span class="eyebrow">RINGKASAN AKTIVITAS</span>
+              <h1>Dashboard</h1>
+              <p>Selamat datang kembali, Administrator!</p>
             </div>
           </div>
-          <div class="time-info">
-            <span class="info-label">Waktu saat ini</span>
-            <strong>{{ timeLabel }}</strong>
+
+          <div class="datetime-bar" aria-live="off">
+            <div class="date-info">
+              <span class="info-dot" aria-hidden="true"></span>
+              <div>
+                <span class="info-label">Tanggal</span>
+                <strong>{{ dateLabel }}</strong>
+              </div>
+            </div>
+            <div class="time-info">
+              <span class="info-label">Waktu saat ini</span>
+              <strong>{{ timeLabel }}</strong>
+            </div>
           </div>
-        </div>
 
-        <div class="statistics-grid">
-          <article class="stat-card">
-            <div class="stat-icon icon-total">
-              <img :src="hardHatIcon" alt="">
-            </div>
-            <div class="stat-details">
-              <p>Total Pekerja</p>
-              <h2>{{ totalWorkers }}</h2>
-              <span class="stat-caption">Pekerja terdaftar</span>
-            </div>
-          </article>
+          <div class="statistics-grid">
+            <article class="stat-card">
+              <div class="stat-icon icon-total">
+                <img :src="hardHatIcon" alt="">
+              </div>
+              <div class="stat-details">
+                <p>Total Pekerja</p>
+                <h2>{{ totalWorkers }}</h2>
+                <span class="stat-caption">Pekerja terdaftar</span>
+              </div>
+            </article>
 
-          <article class="stat-card">
-            <div class="stat-icon icon-present">
-              <img :src="checkIcon" alt="">
-            </div>
-            <div class="stat-details">
-              <p>Hadir</p>
-              <h2>{{ presentWorkers }}</h2>
-              <span class="stat-caption">
-                <span class="status-dot" aria-hidden="true"></span>
-                {{ attendancePercentage }}% dari total pekerja
-              </span>
-            </div>
-          </article>
+            <article class="stat-card">
+              <div class="stat-icon icon-present">
+                <img :src="checkIcon" alt="">
+              </div>
+              <div class="stat-details">
+                <p>Hadir</p>
+                <h2>{{ presentWorkers }}</h2>
+                <span class="stat-caption">
+                  <span class="status-dot" aria-hidden="true"></span>
+                  {{ attendancePercentage }}% dari total pekerja
+                </span>
+              </div>
+            </article>
 
-          <article class="stat-card">
-            <div class="stat-icon icon-absent">
-              <img :src="absentIcon" alt="">
-            </div>
-            <div class="stat-details">
-              <p>Tidak Hadir</p>
-              <h2>{{ absentWorkers }}</h2>
-              <span class="stat-caption">
-                {{ totalWorkers > 0 ? Math.round((absentWorkers / totalWorkers) * 100) : 0 }}% dari total pekerja
-              </span>
-            </div>
-          </article>
-        </div>
-
-        <section class="project-banner" aria-label="Informasi proyek">
-          <div class="banner-content">
-            <span class="banner-label">PANTAU HADIR</span>
-            <h2>Proyek terpantau,<br>Pekerja terdata.</h2>
-            <p>
-              Kelola kehadiran pekerja proyek dengan lebih mudah dan terorganisir.
-            </p>
+            <article class="stat-card">
+              <div class="stat-icon icon-absent">
+                <img :src="absentIcon" alt="">
+              </div>
+              <div class="stat-details">
+                <p>Tidak Hadir</p>
+                <h2>{{ absentWorkers }}</h2>
+                <span class="stat-caption">
+                  {{ totalWorkers > 0 ? Math.round((absentWorkers / totalWorkers) * 100) : 0 }}% dari total pekerja
+                </span>
+              </div>
+            </article>
           </div>
-          <div class="banner-illustration">
-            <img :src="constructionImage" alt="">
-          </div>
+
+          <section class="project-banner" aria-label="Informasi proyek">
+            <div class="banner-content">
+              <span class="banner-label">PANTAU HADIR</span>
+              <h2>Proyek terpantau,<br>Pekerja terdata.</h2>
+              <p>
+                Kelola kehadiran pekerja proyek dengan lebih mudah dan terorganisir.
+              </p>
+            </div>
+            <div class="banner-illustration">
+              <img :src="constructionImage" alt="">
+            </div>
+          </section>
         </section>
-      </section>
-    </main>
+      </main>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .dashboard-shell {
-  min-height: 100vh;
-}
-
-.dashboard-sidebar {
-  min-height: 100vh;
-  padding: var(--space-32) 0 var(--space-24);
-}
-
-.dashboard-brand img {
-  width: 90px;
-  height: 90px;
-  object-fit: cover;
-  object-position: center;
-  border-radius: 50%;
-  overflow: hidden;
-}
-
-
-.dashboard-nav {
   display: grid;
-  gap: var(--space-8);
+  grid-template-columns: var(--sidebar-width, 260px) minmax(0, 1fr);
+  min-height: 100vh;
+  background: var(--color-canvas, #fff);
+  color: var(--color-text-strong, #111);
 }
 
-.dashboard-nav .nav-item {
-  min-height: 52px;
-  gap: 12px;
-  margin-right: var(--space-16);
-  border-radius: 0 var(--radius-md) var(--radius-md) 0;
-  transition: background-color 160ms ease;
+.admin-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 32px 0 24px;
+  border-right: 1px solid rgba(8, 2, 100, 0.08);
+  background: var(--color-sidebar, #c5c9e8);
 }
 
-.dashboard-nav .nav-item:not(.is-active):hover {
-  background: rgba(255, 255, 255, 0.45);
+.sidebar-logo {
+  padding: 0 28px 40px;
+}
+
+.brand-logo {
+  display: block;
+  max-width: 140px;
+  height: auto;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 16px 0 0;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 28px;
+  border: none;
+  background: transparent;
+  color: var(--color-primary, #080264);
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 0 24px 24px 0;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.nav-item:hover {
+  background-color: rgba(255, 255, 255, 0.6);
+}
+
+.nav-item.is-active {
+  background-color: #ffffff;
+  color: var(--color-primary, #080264);
+  box-shadow: 0 2px 10px rgba(8, 2, 100, 0.06);
 }
 
 .nav-icon {
-  width: 22px;
-  flex: 0 0 22px;
-  font-size: 20px;
-  line-height: 1;
-  text-align: center;
-}
-
-.dashboard-sidebar-footer {
-  padding-top: var(--space-24);
-}
-
-
-.logout-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  width: calc(100% - 32px);
-  min-height: 44px;
-  margin: 0 16px 16px;
-  padding: 10px 16px;
-
-  background: var(--color-surface);
-  color: var(--color-primary);
-  border: 1px solid rgba(8, 2, 100, 0.2);
-  border-radius: var(--radius-sm);
-
-  font-weight: 700;
-  text-decoration: none;
-  box-sizing: border-box;
-  cursor: pointer;
-  transition: background-color 160ms ease,
-              box-shadow 160ms ease;
-}
-
-.logout-button:hover {
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow: var(--shadow-panel);
-}
-
-.logout-button:focus-visible {
-  outline: 2px solid var(--color-secondary);
-  outline-offset: 2px;
-}
-
-.logout-button img {
-  width: 20px;
-  height: 20px;
   flex-shrink: 0;
 }
 
-
-.dashboard-copyright {
-  margin-bottom: 0;
-  line-height: 1.6;
-}
-
-.dashboard-main {
-  min-height: 100vh;
-}
-
-.topbar {
-  min-height: var(--header-height);
+.sidebar-footer {
+  margin-top: auto;
+  padding: 24px 24px 8px;
   display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.btn-logout {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-16);
-  padding: 0 var(--space-40);
-  background: var(--color-header);
-  color: var(--color-text-inverse);
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 170px;
+  padding: 8px 18px;
+  background-color: #ffffff;
+  color: var(--color-primary, #080264);
+  border: 1.5px solid var(--color-primary, #080264);
+  border-radius: var(--radius-sm, 8px);
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.btn-logout:hover {
+  background-color: #f2f4fa;
+}
+
+.btn-logout:active {
+  transform: scale(0.98);
+}
+
+.sidebar-copy p {
+  margin: 0;
   font-weight: 700;
 }
 
-.company-name {
-  font-size: 18px;
+.sidebar-copy small {
+  font-size: inherit;
+}
+
+.admin-main-wrap {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: #fff;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--header-height, 56px);
+  padding: 0 36px;
+  background: var(--color-header, #f58220);
+}
+
+.company-title {
+  margin: 0;
+  color: #fff;
+  font-size: 1.25rem;
+  font-style: italic;
+  font-weight: 800;
+  letter-spacing: 0.02em;
 }
 
 .admin-profile {
@@ -301,19 +343,50 @@ const emit = defineEmits([
   gap: 12px;
 }
 
-.profile-avatar {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  overflow: hidden;
-  border-radius: 50%;
-  background: var(--color-surface);
+.admin-label {
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
 }
 
-.profile-avatar img {
+.avatar-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  overflow: hidden;
+  border: 2px solid #fff;
+  border-radius: 50%;
+}
+
+.avatar-icon {
   width: 22px;
   height: 22px;
+}
+
+@media (max-width: 1024px) {
+  .dashboard-shell {
+    grid-template-columns: 200px minmax(0, 1fr);
+  }
+
+  .app-header {
+    padding: 0 20px;
+  }
+}
+
+@media (max-width: 600px) {
+  .dashboard-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-sidebar {
+    min-height: auto;
+  }
+
+  .app-header {
+    padding: 0 16px;
+  }
 }
 
 .dashboard-content {
@@ -621,45 +694,4 @@ const emit = defineEmits([
   }
 }
 
-@media (max-width: 480px) {
-  .dashboard-sidebar {
-    display: block;
-  }
-
-  .dashboard-nav {
-    display: grid;
-  }
-
-  .dashboard-nav .nav-item {
-    margin-right: 0;
-    padding: 10px 12px;
-  }
-
-  .dashboard-sidebar-footer {
-    align-items: flex-start;
-    padding: var(--space-16) 0 0;
-  }
-
-  .dashboard-copyright {
-    font-size: 10px;
-  }
-
-  .topbar {
-    padding: 0 var(--space-16);
-    font-size: 14px;
-  }
-
-  .company-name {
-    font-size: 15px;
-  }
-
-  .admin-profile {
-    gap: 8px;
-  }
-
-  .dashboard-content {
-    gap: var(--space-24);
-    padding: var(--space-24) var(--space-16);
-  }
-}
 </style>

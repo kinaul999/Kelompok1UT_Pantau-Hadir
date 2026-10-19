@@ -66,6 +66,13 @@ const handlePekerjaClick = () => {
 </template>
 
 <style scoped>
+
+.role-option {
+  border: none;
+  cursor: pointer;
+  width: 100%;
+}
+
 .landing-page {
   display: flex;
   min-height: 100vh;

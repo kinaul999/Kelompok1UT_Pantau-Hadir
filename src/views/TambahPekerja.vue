@@ -1,24 +1,74 @@
+<script setup>
+import { reactive, ref } from 'vue'
+import logoPantauHadir from '../assets/images/logo-pantau-hadir.jpg'
+import iconSave from '../assets/icons/save-check.svg'
+import iconCancel from '../assets/icons/circle-x.svg'
+import iconUsers from '../assets/icons/users.svg'
+import iconEye from '../assets/icons/eye.svg'
+import iconEyeOff from '../assets/icons/eye-off.svg'
+
+const emit = defineEmits([
+  'save-pekerja',
+  'cancel-tambah-pekerja'
+])
+
+// State reaktif untuk form input
+const form = reactive({
+  nama: '',
+  nik: '',
+  lokasi: '',
+  password: ''
+})
+
+// State untuk opsi lokasi kerja (bisa disesuaikan atau diambil dari API)
+const daftarLokasi = ref([
+  'Proyek Gedung A - Jakarta Selatan',
+  'Proyek Apartemen B - Jakarta Pusat',
+  'Proyek Infrastruktur C - Tangerang'
+])
+
+// State untuk toggle tampil/sembunyi password
+const showPassword = ref(false)
+
+const togglePasswordVisibility = () => {
+  showPassword.value = !showPassword.value
+}
+
+// Handler tombol simpan
+const handleSubmit = () => {
+  console.log('Data pekerja disubmit:', { ...form })
+  alert('Data pekerja berhasil disimpan!')
+  // Tambahkan logika pemanggilan API / router push di sini
+}
+
+// Handler tombol batal
+const handleBatal = () => {
+  form.nama = ''
+  form.nik = ''
+  form.lokasi = ''
+  form.password = ''
+  // Atau arahkan kembali ke halaman data pekerja, misal: router.push('/data-pekerja')
+}
+
+// Handler tombol keluar
+const handleKeluar = () => {
+  if (confirm('Apakah Anda yakin ingin keluar?')) {
+    console.log('Admin keluar')
+  }
+}
+</script>
+
 <template>
   <div class="app-container">
     <!-- SIDEBAR -->
     <aside>
       <div class="logo">
-        <img src="assets/images/logo-pantau-hadir.jpg" width="200" alt="Pantau Hadir - Sistem Absensi Pekerja Proyek">
+        <img :src="logoPantauHadir" width="200" alt="Pantau Hadir - Sistem Absensi Pekerja Proyek">
       </div>
 
-      <nav>
-        <ul>
-          <li><a href="admin-dashboard.html">Dashboard</a></li>
-          <li><a href="rekapitulasi-absensi.html">Rekap Absensi</a></li>
-          <li><a href="data-pekerja.html" class="aktif">Data Pekerja</a></li>
-        </ul>
-      </nav>
+      
 
       <div class="sidebar-bawah">
-        <button type="button" class="btn-keluar" @click="handleKeluar">
-          Keluar <img src="assets/icons/log-out.svg" alt="">
-        </button>
-
         <p class="copyright">
           © 2026 Pantau Hadir App<br>Sistem Absensi Pekerja Proyek
           <small>Halaman ini dibuat Oleh Adil Iskandar Z</small>
@@ -33,7 +83,7 @@
         <h2>PT. Jalan Baru</h2>
         <div class="admin">
           <span>Admin</span>
-          <img src="assets/icons/users.svg" alt="Foto profil admin">
+          <img :src="iconUsers" alt="Foto profil admin">
         </div>
       </header>
 
@@ -86,18 +136,18 @@
               required
             >
             <img 
-              :src="showPassword ? 'assets/icons/eye.svg' : 'assets/icons/eye-off.svg'" 
+              :src="showPassword ? iconEyeOff : iconEye" 
               alt="Toggle password"
               @click="togglePasswordVisibility"
             >
           </div>
 
           <div class="aksi">
-            <button type="button" class="btn-batal" @click="handleBatal">
-              Batal <img src="assets/icons/circle-x.svg" alt="">
+            <button type="button" class="btn-cancel" @click.prevent="emit('cancel-tambah-pekerja')">
+              Batal <img :src="iconCancel" alt="">
             </button>
-            <button type="submit" class="btn-simpan">
-              Simpan <img src="assets/icons/Check.svg" alt="">
+            <button type="submit" class="btn-primary" @click.prevent="emit('save-pekerja', form)">
+              Simpan <img :src="iconSave" alt="">
             </button>
           </div>
         </form>
@@ -105,55 +155,6 @@
     </div>
   </div>
 </template>
-
-<script setup>
-import { reactive, ref } from 'vue'
-
-// State reaktif untuk form input
-const form = reactive({
-  nama: '',
-  nik: '',
-  lokasi: '',
-  password: ''
-})
-
-// State untuk opsi lokasi kerja (bisa disesuaikan atau diambil dari API)
-const daftarLokasi = ref([
-  'Proyek Gedung A - Jakarta Selatan',
-  'Proyek Apartemen B - Jakarta Pusat',
-  'Proyek Infrastruktur C - Tangerang'
-])
-
-// State untuk toggle tampil/sembunyi password
-const showPassword = ref(false)
-
-const togglePasswordVisibility = () => {
-  showPassword.value = !showPassword.value
-}
-
-// Handler tombol simpan
-const handleSubmit = () => {
-  console.log('Data pekerja disubmit:', { ...form })
-  alert('Data pekerja berhasil disimpan!')
-  // Tambahkan logika pemanggilan API / router push di sini
-}
-
-// Handler tombol batal
-const handleBatal = () => {
-  form.nama = ''
-  form.nik = ''
-  form.lokasi = ''
-  form.password = ''
-  // Atau arahkan kembali ke halaman data pekerja, misal: router.push('/data-pekerja')
-}
-
-// Handler tombol keluar
-const handleKeluar = () => {
-  if (confirm('Apakah Anda yakin ingin keluar?')) {
-    console.log('Admin keluar')
-  }
-}
-</script>
 
 <style scoped>
 :root {
@@ -352,7 +353,7 @@ select { appearance: auto; cursor: pointer; }
 .btn-batal {
   background: #ffffff;
   color: #14146b;
-  border: 1px: 1px solid #14146b;
+  border: 1px solid #14146b;
 }
 .btn-batal:hover { background: #eef1fb; }
 

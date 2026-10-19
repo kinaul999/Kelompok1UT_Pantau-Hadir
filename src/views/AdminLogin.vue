@@ -1,327 +1,437 @@
-<template>
-  <div class="login-container">
-    <!-- Header -->
-    <header>
-      <img src="assets/images/logo-pantau-hadir.jpg" width="200" alt="Logo Hadir"[cite: 1]>
-      <h2>Sistem Absensi Pekerja Proyek</h2>[cite: 1]
-    </header>
-
-    <!-- Konten Utama -->
-    <main>
-      <section>
-        <h1>Masuk ke Akun Anda</h1>[cite: 1]
-        <p>Masukkan NIK dan password Anda untuk mengakses sistem</p>[cite: 1]
-
-        <form @submit.prevent="handleLogin">
-          <div>
-            <label for="nik">NIK</label>[cite: 1]
-            <input 
-              type="text" 
-              id="nik" 
-              v-model="nik" 
-              placeholder="Masukkan Nomor Induk Karyawan Anda" 
-              required
-            >
-          </div>
-
-          <div>
-            <label for="password">Kata Sandi</label>[cite: 1]
-            <input 
-              :type="showPassword ? 'text' : 'password'" 
-              id="password" 
-              v-model="password" 
-              placeholder="Masukkan Kata Sandi Anda" 
-              required
-            >
-            <button 
-              type="button" 
-              id="togglePassword" 
-              @click="togglePasswordVisibility" 
-              aria-label="Tampilkan/sembunyikan kata sandi"
-            >
-              <img 
-                :src="showPassword ? 'icons/eye.svg' : 'assets/icons/eye-off.svg'" 
-                width="10" 
-                alt="Toggle sandi"
-              >
-            </button>
-          </div>
-            
-          <button type="submit">
-            <span class="btn-content">
-              <img src="assets/icons/log-in.svg" width="15" alt="">
-              MASUK KE SISTEM
-            </span>
-          </button>
-        </form>
-
-        <hr>
-
-        <a href="#" @click.prevent="goToHome">
-          <img src="assets/icons/house.svg" width="20" alt="">
-          Kembali ke Beranda
-        </a>
-      </section>
-    </main>
-
-    <!-- Footer -->
-    <footer>
-      <p><small>© 2026 Pantau Hadir App — Sistem Absensi Pekerja Proyek</small></p>[cite: 1]
-      <small>halaman ini dikerjakan oleh Adil Iskandar Z</small>[cite: 1]
-    </footer>
-  </div>
-</template>
-
 <script setup>
 import { ref } from 'vue'
+import iconLogin from '../assets/icons/log-in.svg'
+import iconHouse from '../assets/icons/house.svg'
+import iconEye from '../assets/icons/eye.svg'
+import iconEyeOff from '../assets/icons/eye-off.svg'
+import logoPantauHadir from '../assets/images/logo-pantau-hadir.svg'
+import imgKonstruksi from '../assets/images/images-konstruksi-biru-removebg-preview.png'
 
-// State untuk form input
+const emit = defineEmits(['admin-login-success', 'admin-logout-trigger'])
+
+const idPerusahaan = ref('')
 const nik = ref('')
 const password = ref('')
 const showPassword = ref(false)
 
-// Fungsi untuk toggle visibilitas kata sandi
 const togglePasswordVisibility = () => {
   showPassword.value = !showPassword.value
 }
 
-// Fungsi ketika tombol masuk ditekan
 const handleLogin = () => {
-  console.log('Login dengan NIK:', nik.value)
-  // Contoh redirect ke halaman admin dashboard menggunakan Vue Router:
-  // router.push('/admin-dashboard')
+  if (!idPerusahaan.value.trim() || !nik.value.trim() || !password.value.trim()) return
+  emit('admin-login-success', {
+    idPerusahaan: idPerusahaan.value.trim(),
+    nik: nik.value.trim(),
+    password: password.value
+  })
 }
 
-// Fungsi kembali ke beranda
 const goToHome = () => {
-  // router.push('/')
+  emit('admin-logout-trigger')
 }
 </script>
 
+<template>
+  <div class="admin-login-layout">
+    <header class="app-topbar">
+      <h2 class="topbar-title">Sistem Absensi Pekerja Proyek</h2>
+    </header>
+
+    <div class="brand-bar">
+      <img
+        :src="logoPantauHadir"
+        width="140"
+        height="76"
+        alt="Logo Pantau Hadir"
+        class="brand-logo"
+      />
+    </div>
+
+    <div class="illustration-bg" aria-hidden="true">
+      <img
+        :src="imgKonstruksi"
+        alt=""
+        class="illustration-img"
+        opacity="0.50"
+      />
+    </div>
+
+    <main class="login-main">
+      <section class="admin-login-card" aria-labelledby="admin-login-heading">
+        <h1 id="admin-login-heading" class="card-title">Masuk ke Akun Anda</h1>
+        <p class="card-subtitle">Masukkan NIK dan password Anda untuk mengakses sistem</p>
+
+        <form class="login-form" @submit.prevent="handleLogin">
+          <div class="form-group">
+            <label for="admin-id-perusahaan" class="form-label">ID Perusahaan</label>
+            <input
+              id="admin-id-perusahaan"
+              v-model="idPerusahaan"
+              type="text"
+              name="id-perusahaan"
+              class="form-input"
+              placeholder="Masukkan ID Perusahaan Anda"
+              autocomplete="username"
+              autofocus
+              required
+            />
+          </div>
+        
+          <div class="form-group">
+            <label for="admin-nik" class="form-label">NIK</label>
+            <input
+              id="admin-nik"
+              v-model="nik"
+              type="text"
+              name="nik"
+              class="form-input"
+              placeholder="Masukkan Nomor Induk Karyawan Anda"
+              autocomplete="username"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="admin-password" class="form-label">Kata Sandi</label>
+            <div class="password-field">
+              <input
+                id="admin-password"
+                v-model="password"
+                :type="showPassword ? 'text' : 'password'"
+                name="password"
+                class="form-input input-password"
+                placeholder="Masukkan Kata Sandi Anda"
+                autocomplete="current-password"
+                required
+              />
+              <button
+                type="button"
+                class="password-toggle"
+                :aria-label="showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'"
+                :aria-pressed="showPassword"
+                @click="togglePasswordVisibility"
+              >
+                <img
+                  :src="showPassword ? iconEyeOff : iconEye"
+                  width="18"
+                  height="18"
+                  alt=""
+                  aria-hidden="true"
+                />
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-submit">
+            <img :src="iconLogin" width="18" height="18" alt="" class="btn-icon" aria-hidden="true" />
+            <span>MASUK KE SISTEM</span>
+          </button>
+        </form>
+
+        <hr class="card-divider" />
+
+        <button type="button" class="btn-home" @click="goToHome">
+          <img :src="iconHouse" width="18" height="18" alt="" aria-hidden="true" />
+          <span>Kembali ke Beranda</span>
+        </button>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <p class="footer-copy">
+        <small>© 2026 Pantau Hadir App - Sistem Absensi Pekerja Proyek</small>
+      </p>
+    </footer>
+  </div>
+</template>
+
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,700;1,700;1,800&display=swap');
-
-:root {
-  --orange: #f26419;
-  --navy: #05005a;
-  --card: rgba(218, 224, 243, 0.92);
-  --ink: #000;
-  --muted: #8a8fa3;
-  --blue-soft: #b9d4f6;
-  --blue-mid: #8fa6dc;
-  --silhouette: #7f93c8;
-}
-
-* { 
-  box-sizing: border-box; 
-  margin: 0; 
-  padding: 0; 
-}
-
-/* Mengatur wrapper utama komponen (.login-container) agar mengambil alih fungsi body */
-.login-container {
+.admin-login-layout {
+  position: relative;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  font-family: "Plus Jakarta Sans", "Segoe UI", Arial, sans-serif;
-  color: var(--ink);
-  background-color: #fff;
-  background-image: url('assets/images/images-konstruksi-biru.jpg');
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 100%;
+  background-color: var(--color-surface, #ffffff);
+  color: var(--color-text-strong, #111111);
+  font-family: var(--font-family);
+  overflow-x: hidden;
+  isolation: isolate;
 }
 
-/* ===== Header ===== */
-header {
+.app-topbar {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: var(--header-height, 56px);
+  padding: 0 var(--space-24, 24px);
+  background-color: var(--color-header, #f58220);
+  z-index: 2;
 }
 
-header h2 {
-  order: -1;
-  background: var(--orange);
-  color: #fff;
+.topbar-title {
+  margin: 0;
+  color: var(--color-text-inverse, #ffffff);
+  font-size: 1.15rem;
   font-style: italic;
   font-weight: 800;
-  font-size: 1.15rem;
-  text-align: right;
-  padding: 0.6rem 1.1rem;
-  letter-spacing: 0.1px;
+  letter-spacing: 0.02em;
 }
 
-/* ===== Konten utama ===== */
-main {
-  flex: 1;
+.brand-bar {
+  position: relative;
+  z-index: 2;
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-  padding: 1.5rem 1rem 3rem;
+  align-items: center;
+  padding: 20px 24px 0;
 }
 
-main section {
+.brand-logo {
+  display: block;
+  max-width: 140px;
+  height: auto;
+}
+
+.illustration-bg {
+  position: absolute;
+  inset: 0;
+  top: var(--header-height, 56px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+  opacity: 50%;
+}
+
+.illustration-img {
   width: 100%;
-  max-width: 350px;
-  background: var(--card);
-  border-radius: 20px;
-  padding: 1.5rem 1.4rem 1.8rem;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
-  backdrop-filter: blur(1px);
+  max-width: 1100px;
+  max-height: 85vh;
+  object-fit: contain;
+  object-position: center bottom;
+  opacity: 0.95;
 }
 
-main h1 {
-  font-size: 1.1rem;
+.login-main {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px 36px;
+}
+
+.admin-login-card {
+  width: 100%;
+  max-width: 440px;
+  background-color: rgba(218, 224, 243, 0.92);
+  border-radius: var(--radius-xl, 24px);
+  padding: 36px 36px 32px;
+  box-shadow: 0 12px 32px rgba(8, 12, 100, 0.16);
+  backdrop-filter: blur(6px);
+}
+
+.card-title {
+  font-family: var(--font-family);
+  font-size: 1.65rem;
   font-style: italic;
   font-weight: 800;
   line-height: 1.2;
+  color: #000000;
+  margin: 0 0 6px;
 }
 
-main section > p {
-  font-size: 0.62rem;
-  margin: 0.15rem 0 1.6rem;
+.card-subtitle {
+  font-family: var(--font-family);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: #333333;
+  margin: 0 0 24px;
 }
 
-/* ===== Form ===== */
-form { 
-  padding: 0 0.9rem; 
-}
-
-form > div {
-  position: relative;
-  margin-bottom: 0.55rem;
-}
-
-label {
-  display: block;
-  font-size: 0.78rem;
-  font-weight: 500;
-  margin-bottom: 0.15rem;
-}
-
-input[type="text"],
-input[type="password"] {
-  width: 100%;
-  height: 2rem;
-  padding: 0 1.8rem 0 0.55rem;
-  font: inherit;
-  font-size: 0.62rem;
-  color: var(--ink);
-  background: #fff;
-  border: 1px solid #333;
-  border-radius: 5px;
-  outline: none;
-}
-
-input::placeholder { 
-  color: var(--muted); 
-}
-
-input:focus-visible {
-  border-color: var(--navy);
-  box-shadow: 0 0 0 2px rgba(5, 0, 90, 0.25);
-}
-
-/* Tombol tampilkan/sembunyikan sandi */
-#togglePassword {
-  position: absolute;
-  right: 0.4rem;
-  bottom: 0.2rem;
+.login-form {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1rem;
-  height: 1.5rem;
-  background: none;
-  border: 0;
-  cursor: pointer;
+  flex-direction: column;
+  gap: 16px;
 }
 
-#togglePassword img { 
-  width: 13px; 
-  height: auto; 
-  display: block; 
-}
-
-/* Tombol submit */
-form > button[type="submit"] {
+.form-group {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  width: 100%;
-  height: 1.6rem;
-  margin-top: 1.4rem;
-  font: inherit;
-  font-size: 0.6rem;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-family: var(--font-family);
+  font-size: 0.95rem;
   font-weight: 700;
-  color: #fff;
-  background: var(--navy);
-  border: 0;
-  border-radius: 5px;
+  color: var(--color-text-strong, #111111);
+}
+
+.password-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.form-input {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  background-color: #ffffff;
+  color: #000000;
+  font-family: var(--font-family);
+  font-size: 0.88rem;
+  border: 1.5px solid #222222;
+  border-radius: var(--radius-sm, 8px);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.form-input::placeholder {
+  color: #888888;
+  font-weight: 400;
+}
+
+.form-input:focus {
+  border-color: var(--color-primary, #080264);
+  box-shadow: 0 0 0 3px rgba(8, 2, 100, 0.18);
+}
+
+.input-password {
+  padding-right: 46px;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
   cursor: pointer;
-  transition: background 0.15s ease;
+  color: #555555;
+  transition: opacity 0.15s ease;
 }
 
-form > button[type="submit"]:hover { 
-  background: #1a1480; 
+.password-toggle:hover {
+  opacity: 0.7;
 }
 
-form > button[type="submit"]:focus-visible { 
-  outline: 2px solid var(--orange); 
-  outline-offset: 2px; 
+.password-toggle:focus-visible {
+  outline: 2px solid var(--color-primary, #080264);
+  outline-offset: 1px;
 }
 
-form > button[type="submit"] img {
-  width: 12px;
-  height: auto;
+.btn-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 46px;
+  margin-top: 10px;
+  background-color: var(--color-primary, #080264);
+  color: #ffffff;
+  font-family: var(--font-family);
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  border: none;
+  border-radius: var(--radius-sm, 8px);
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.btn-submit:hover {
+  background-color: #050046;
+}
+
+.btn-submit:active {
+  transform: scale(0.99);
+}
+
+.btn-submit:focus-visible {
+  outline: 3px solid var(--color-accent, #f58220);
+  outline-offset: 2px;
+}
+
+.btn-icon {
   filter: brightness(0) invert(1);
 }
 
-/* Pemisah & tautan beranda */
-hr {
+.card-divider {
   border: 0;
-  border-top: 1px solid #222;
-  margin: 1rem 0.9rem 0.8rem;
+  border-top: 1px solid #222222;
+  margin: 20px 0 16px;
+  opacity: 0.85;
 }
 
-main section > a {
+.btn-home {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.3rem;
-  font-size: 0.6rem;
+  gap: 8px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--color-primary, #080264);
+  font-family: var(--font-family);
+  font-size: 0.88rem;
   font-style: italic;
   font-weight: 800;
-  color: var(--navy);
   text-decoration: underline;
+  cursor: pointer;
+  padding: 6px;
+  transition: opacity 0.15s ease;
 }
 
-main section > a img { 
-  width: 13px; 
-  height: auto; 
+.btn-home:hover {
+  opacity: 0.75;
 }
 
-/* ===== Footer ===== */
-footer {
+.btn-home:focus-visible {
+  outline: 2px solid var(--color-primary, #080264);
+  outline-offset: 2px;
+}
+
+.app-footer {
+  position: relative;
+  z-index: 2;
+  padding: 8px 16px 18px;
   text-align: center;
-  padding: 0 1rem 0.9rem;
-  font-size: 0.5rem;
+}
+
+.footer-copy {
+  margin: 0;
   color: #4a5170;
+  font-size: 0.75rem;
 }
 
-footer small { 
-  font-size: inherit; 
-}
+@media (max-width: 640px) {
+  .brand-bar {
+    padding: 12px 20px 0;
+  }
 
-footer small + small { 
-  display: none; 
-}
+  .topbar-title {
+    font-size: 1rem;
+  }
 
-/* ===== Layar kecil ===== */
-@media (max-width: 480px) {
-  header h2 { font-size: 0.95rem; }
-  main section { max-width: 100%; }
-  form { padding: 0; }
-  hr { margin-inline: 0; }
+  .admin-login-card {
+    padding: 24px 20px 22px;
+    border-radius: 18px;
+  }
+
+  .card-title {
+    font-size: 1.4rem;
+  }
 }
 </style>

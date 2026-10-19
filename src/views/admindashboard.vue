@@ -46,6 +46,13 @@ onMounted(() => {
 onUnmounted(() => {
   window.clearInterval(clockInterval)
 })
+
+const emit = defineEmits([
+  'admin-logout-trigger',
+  'data-pekerja-trigger',
+  'rekapitulasi-absen-trigger',
+  'admin-dashboard-trigger'
+])
 </script>
 
 <template>
@@ -56,22 +63,22 @@ onUnmounted(() => {
       </div>
 
       <nav class="dashboard-nav" aria-label="Navigasi utama">
-        <a href="admin-dashboard.html" class="nav-item active is-active" aria-current="page">
+        <a href="#dashboard" class="nav-item active is-active" aria-current="page" @click.prevent="emit('admin-dashboard-trigger')">
           <span class="nav-icon" aria-hidden="true">▦</span>
           <span>Dashboard</span>
         </a>
-        <a href="rekapitulasi-absensi.html" class="nav-item">
+        <a href="#rekap" class="nav-item" @click.prevent="emit('rekapitulasi-absen-trigger')">
           <span class="nav-icon" aria-hidden="true">▤</span>
           <span>Rekapitulasi Absensi</span>
         </a>
-        <a href="data-pekerja.html" class="nav-item">
+        <a href="#data-pekerja" class="nav-item" @click.prevent="emit('data-pekerja-trigger')">
           <span class="nav-icon" aria-hidden="true">♙</span>
           <span>Data Pekerja</span>
         </a>
       </nav>
 
       <div class="sidebar-footer dashboard-sidebar-footer">
-        <a href="index.html" class="logout-button">
+        <a href="#keluar" class="logout-button" @click.prevent="emit('admin-logout-trigger')">
           <img :src="logoutIcon" alt="">
           <span>Keluar</span>
         </a>

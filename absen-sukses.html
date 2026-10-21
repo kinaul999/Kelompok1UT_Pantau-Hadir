@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Absen Berhasil — Pantau Hadir</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="icon" href="assets/images/logo-pantau-hadir.jpg">
+</head>
+<body class="worker-body">
+  <div class="worker-wrap">
+    <div class="orange-topbar">
+      <a href="#" class="keluar-btn" data-logout><span id="i-back"></span> Keluar</a>
+    </div>
+
+    <div style="text-align:center;padding:26px 0 6px">
+      <div class="success-green" id="i-check"></div>
+      <h1 style="font-size:22px;font-weight:800;color:var(--primary);letter-spacing:.02em" id="title">ABSEN ANDA TERKIRIM!</h1>
+      <p class="text-muted text-sm mt-8" id="sub">Kehadiran Anda berhasil dicatat oleh sistem.</p>
+    </div>
+
+    <div class="card card-pad" style="margin-top:10px">
+      <div class="detail-grid" id="detailGrid"></div>
+      <div id="photoWrap" style="display:none;margin-top:14px">
+        <div class="text-sm text-muted mb-8">Bukti Foto:</div>
+        <img id="photo" style="width:100%;border-radius:12px;border:1px solid var(--line)" alt="Bukti absen">
+      </div>
+    </div>
+
+    <div class="card card-pad mt-16">
+      <h3 style="font-size:15px;color:var(--primary);font-weight:800">Riwayat Absensi</h3>
+      <table class="riwayat">
+        <thead><tr><th>Hari/Tgl</th><th>Waktu</th><th>Lokasi</th></tr></thead>
+        <tbody id="histBody"></tbody>
+      </table>
+      <div class="pager">
+        <button id="prevPage" aria-label="Sebelumnya"><span id="i-prev"></span></button>
+        <button id="nextPage" aria-label="Berikutnya"><span id="i-next"></span></button>
+      </div>
+    </div>
+
+    <a href="pekerja-dashboard.html" class="btn btn-absen" style="text-decoration:none"><span id="i-dash"></span> Kembali ke Dashboard</a>
+
+    <div style="text-align:center;margin-top:26px;padding-bottom:10px">
+      <div class="logo-box" style="padding:8px 14px"><img class="logo-img" src="assets/images/logo-pantau-hadir.jpg" alt="Pantau Hadir" style="height:44px"></div>
+    </div>
+  </div>
+
+  <script src="assets/js/app.js"></script>
+  <script>
+    var sess = PH.requireRole('worker');
+    document.getElementById('i-back').innerHTML = PH.icon('arrow-left');
+    document.getElementById('i-check').innerHTML = PH.icon('check');
+    document.getElementById('i-prev').innerHTML = PH.icon('arrow-left');
+    document.getElementById('i-next').innerHTML = PH.icon('arrow-right');
+    document.getElementById('i-dash').innerHTML = PH.icon('home');
+
+    var type = PH.param('type') || 'masuk';
+    var id = PH.param('id');
+    var rec = id ? PH.getAttendance().find(function(a){return a.id===id;}) : null;
+    if (!rec) rec = PH.workerHistory(sess.workerId, 1)[0];
+
+    document.getElementById('title').textContent = type==='pulang' ? 'ABSEN PULANG TERCATAT!' : 'ABSEN MASUK TERCATAT!';
+    var isLate = rec && rec.status==='Terlambat';
+    var waktu = type==='pulang' ? rec.checkOut : rec.checkIn;
+    var photo = type==='pulang' ? rec.photoOut : rec.photoIn;
+
+    var items = [
+      {k:'Nama', v: sess.nama},
+      {k:'NIK', v: sess.nik},
+      {k:'Lokasi', v: sess.site},
+      {k:'Tanggal', v: rec ? PH.fmtTanggalSingkat(rec.date) : '-'},
+      {k:'Waktu Absen', v: PH.fmtWaktu(waktu) + ' WIB'},
+      {k:'Status', v: rec ? rec.status : '-', badge: isLate ? 'warning' : 'success'}
+    ];
+    document.getElementById('detailGrid').innerHTML = items.map(function(it){
+      var val = it.badge ? '<span class="badge badge-'+it.badge+'">'+it.v+'</span>' : it.v;
+      return '<div class="detail-item"><div class="k">'+it.k+'</div><div class="v">'+val+'</div></div>';
+    }).join('');
+
+    if (photo) {
+      document.getElementById('photoWrap').style.display='block';
+      document.getElementById('photo').src = photo;
+    }
+
+    // Riwayat with pagination (5 per page)
+    var hist = PH.workerHistory(sess.workerId, 30);
+    var PER = 5, page = 0;
+    function renderHist(){
+      var rows = hist.slice(page*PER, page*PER+PER);
+      document.getElementById('histBody').innerHTML = rows.length ? rows.map(function(h){
+        var t = h.checkOut && (!h.checkIn || h.checkOut > h.checkIn) ? h.checkOut : h.checkIn;
+        var label = (t===h.checkIn) ? 'Masuk' : 'Pulang';
+        return '<tr><td>'+PH.fmtTanggalSingkat(h.date)+'</td><td>'+PH.fmtWaktu(t)+' '+label+'</td><td>'+h.site+'</td></tr>';
+      }).join('') : '<tr><td colspan="3" style="text-align:center">Tidak ada riwayat.</td></tr>';
+      document.getElementById('prevPage').disabled = page===0;
+      document.getElementById('nextPage').disabled = (page+1)*PER >= hist.length;
+    }
+    document.getElementById('prevPage').addEventListener('click', function(){ if(page>0){page--;renderHist();} });
+    document.getElementById('nextPage').addEventListener('click', function(){ if((page+1)*PER<hist.length){page++;renderHist();} });
+    renderHist();
+  </script>
+</body>
+</html>

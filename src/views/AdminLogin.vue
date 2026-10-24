@@ -1,5 +1,8 @@
+```vue
 <script setup>
 import { ref } from 'vue'
+import { supabase } from '../lib/supabase'
+
 import iconLogin from '../assets/icons/log-in.svg'
 import iconHouse from '../assets/icons/house.svg'
 import iconEye from '../assets/icons/eye.svg'
@@ -7,26 +10,88 @@ import iconEyeOff from '../assets/icons/eye-off.svg'
 import logoPantauHadir from '../assets/images/logo-pantau-hadir.svg'
 import imgKonstruksi from '../assets/images/images-konstruksi-biru-removebg-preview.png'
 
-const emit = defineEmits(['admin-login-success', 'admin-logout-trigger'])
+const emit = defineEmits([
+  'admin-login-success',
+  'admin-logout-trigger'
+])
 
 const nik = ref('')
 const password = ref('')
 const showPassword = ref(false)
+const loginError = ref('')
+const isLoading = ref(false)
 
 const togglePasswordVisibility = () => {
   showPassword.value = !showPassword.value
 }
 
-const handleLogin = () => {
-  if (!nik.value.trim() || !password.value.trim()) return
 
-  emit('admin-login-success', {
-    nik: nik.value.trim(),
-    password: password.value
-  })
+const handleLogin = async () => {
+  if (isLoading.value) return
+
+  loginError.value = ''
+
+  const nikInput = nik.value.trim()
+  const passwordInput = password.value
+
+  if (!nikInput || !passwordInput) {
+    loginError.value = 'NIK dan kata sandi wajib diisi.'
+    return
+  }
+
+  isLoading.value = true
+
+  try {
+    // 1. Login terlebih dahulu ke Supabase Authentication
+    const { data, error: authError } =
+      await supabase.auth.signInWithPassword({
+        email: 'pedangrusak279@gmail.com',
+        password: passwordInput
+      })
+
+    if (authError) {
+      loginError.value = 'Email atau kata sandi salah.'
+      return
+    }
+
+    // 2. Cari data admin berdasarkan UID akun yang login
+    const { data: admin, error: adminError } = await supabase
+      .from('admins')
+      .select('auth_user_id, nik, name, status')
+      .eq('auth_user_id', data.user.id)
+      .maybeSingle()
+
+    if (adminError) throw adminError
+
+    // 3. Validasi NIK dan status admin
+    if (
+      !admin ||
+      admin.nik !== nikInput ||
+      admin.status !== 'active'
+    ) {
+      await supabase.auth.signOut()
+      loginError.value =
+        'NIK tidak cocok atau akun admin tidak aktif.'
+      return
+    }
+
+    // 4. Login berhasil, pindah ke dashboard
+    emit('admin-login-success', {
+      nik: admin.nik,
+      name: admin.name
+    })
+  } catch (error) {
+    console.error('Login admin gagal:', error)
+    loginError.value =
+      'Terjadi kesalahan saat memeriksa akun. Silakan coba lagi.'
+  } finally {
+    isLoading.value = false
+  }
 }
 
-const goToHome = () => {
+
+const goToHome = async () => {
+  await supabase.auth.signOut()
   emit('admin-logout-trigger')
 }
 </script>
@@ -62,6 +127,9 @@ const goToHome = () => {
         <p class="card-subtitle">Masukkan NIK dan password Anda untuk mengakses sistem</p>
 
         <form class="login-form" @submit.prevent="handleLogin">
+          <p v-if="loginError" class="login-error" role="alert">
+  {{ loginError }}
+</p>
         
           <div class="form-group">
             <label for="admin-nik" class="form-label">NIK</label>
@@ -108,9 +176,16 @@ const goToHome = () => {
             </div>
           </div>
 
-          <button type="submit" class="btn-submit">
-            <img :src="iconLogin" width="18" height="18" alt="" class="btn-icon" aria-hidden="true" />
-            <span>MASUK KE SISTEM</span>
+          <button type="submit" class="btn-submit" :disabled="isLoading">
+  <img
+    :src="iconLogin"
+    width="18"
+    height="18"
+    alt=""
+    class="btn-icon"
+    aria-hidden="true"
+  />
+  <span>{{ isLoading ? 'MEMERIKSA...' : 'MASUK KE SISTEM' }}</span>
           </button>
         </form>
 
@@ -305,6 +380,20 @@ const goToHome = () => {
   cursor: pointer;
   color: #555555;
   transition: opacity 0.15s ease;
+}
+
+.login-error {
+  margin: 0;
+  padding: 10px 12px;
+  color: #b42318;
+  background-color: #fee4e2;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.btn-submit:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 .password-toggle:hover {

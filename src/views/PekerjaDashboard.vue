@@ -1,5 +1,14 @@
+
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import {
+  ref,
+  computed,
+  onMounted,
+  onUnmounted,
+  nextTick
+} from 'vue'
+
+import { supabase } from '../lib/supabase'
 
 import iconLogOut from '../assets/icons/log-out.svg'
 import iconScanFace from '../assets/icons/scan-face.svg'
@@ -8,240 +17,723 @@ import iconCircleCheck from '../assets/icons/circle-check.svg'
 import iconCircleX from '../assets/icons/circle-x.svg'
 import logoPantauHadir from '../assets/images/logo-pantau-hadir.svg'
 
-// Status Lokasi Pekerja: 'inside' (di dalam area) atau 'outside' (di luar area)
-const workerLocationStatus = ref('inside') 
+const props = defineProps({
+  worker: {
+    type: Object,
+    default: null
+  }
+})
 
-// State Aksi: Pop-up Modal Kamera Asli
+const emit = defineEmits([
+  'absen-complete',
+  'logout-trigger'
+])
+
+// ==================================================
+// IDENTITAS PEKERJA
+// ==================================================
+
+const workerName = computed(() => {
+  return props.worker?.name || 'Pekerja'
+})
+
+const workerNik = computed(() => {
+  return props.worker?.nik || '-'
+})
+
+// ==================================================
+// INFORMASI SITE DAN GEOFENCING
+// ==================================================
+
+const siteName = ref('Memuat lokasi proyek...')
+const siteAddress = ref('')
+
+const siteLatitude = ref(null)
+const siteLongitude = ref(null)
+const siteRadius = ref(500)
+
+const workerLocationStatus = ref('checking')
+const gpsMessage = ref('Memeriksa lokasi perangkat...')
+
+const workerLatitude = ref(null)
+const workerLongitude = ref(null)
+const distanceToSite = ref(null)
+const gpsAccuracy = ref(null)
+
+let watchId = null
+
+const isInsideArea = computed(() => {
+  return workerLocationStatus.value === 'inside'
+})
+
+const locationStatusText = computed(() => {
+  if (workerLocationStatus.value === 'inside') {
+    return 'DI DALAM AREA PROYEK'
+  }
+
+  if (workerLocationStatus.value === 'outside') {
+    return 'DI LUAR AREA PROYEK'
+  }
+
+  if (workerLocationStatus.value === 'error') {
+    return 'LOKASI TIDAK TERSEDIA'
+  }
+
+  return 'MEMERIKSA LOKASI'
+})
+
+const isAttendanceReady = computed(() => {
+  return isInsideArea.value && isPhotoCaptured.value
+})
+
+// Membaca angka dari beberapa kemungkinan nama kolom
+const getNumberFromSite = (site, names) => {
+  for (const name of names) {
+    const value = site?.[name]
+
+    if (
+      value !== null &&
+      value !== undefined &&
+      value !== '' &&
+      Number.isFinite(Number(value))
+    ) {
+      return Number(value)
+    }
+  }
+
+  return null
+}
+
+// Mengambil informasi site berdasarkan site_id pekerja
+const loadSite = async () => {
+  if (!props.worker?.site_id) {
+    siteName.value = 'Site belum ditentukan'
+    gpsMessage.value =
+      'Data site pekerja belum tersedia.'
+    workerLocationStatus.value = 'error'
+    return
+  }
+
+  const { data, error } = await supabase
+    .from('Sites')
+    .select('*')
+    .eq('id', props.worker.site_id)
+    .maybeSingle()
+
+  if (error) {
+    console.error('Gagal membaca data site:', error)
+
+    siteName.value = 'Site tidak dapat dimuat'
+    gpsMessage.value =
+      'Gagal membaca data proyek. Periksa izin akses tabel Sites.'
+    workerLocationStatus.value = 'error'
+    return
+  }
+
+  if (!data) {
+    siteName.value = 'Site tidak ditemukan'
+    gpsMessage.value =
+      'Site pekerja tidak ditemukan di tabel Sites.'
+    workerLocationStatus.value = 'error'
+    return
+  }
+
+  // Sesuaikan dengan nama kolom yang tersedia
+  siteName.value =
+    data.name ||
+    data.site_name ||
+    data.nama_site ||
+    data.project_name ||
+    'Proyek'
+
+  siteAddress.value =
+    data.address ||
+    data.alamat ||
+    data.location ||
+    data.lokasi ||
+    ''
+
+  siteLatitude.value = getNumberFromSite(data, [
+    'latitude',
+    'lat',
+    'site_latitude',
+    'site_lat',
+    'gps_latitude'
+  ])
+
+  siteLongitude.value = getNumberFromSite(data, [
+    'longitude',
+    'lng',
+    'lon',
+    'site_longitude',
+    'site_lng',
+    'gps_longitude'
+  ])
+
+  const radius = getNumberFromSite(data, [
+    'radius',
+    'radius_meters',
+    'radius_meter',
+    'geofence_radius'
+  ])
+
+  if (radius !== null && radius > 0) {
+    siteRadius.value = radius
+  }
+
+  if (
+    siteLatitude.value === null ||
+    siteLongitude.value === null ||
+    Math.abs(siteLatitude.value) > 90 ||
+    Math.abs(siteLongitude.value) > 180
+  ) {
+    siteName.value = siteName.value
+    workerLocationStatus.value = 'error'
+    gpsMessage.value =
+      'Koordinat proyek belum tersedia atau tidak valid. Periksa kolom latitude dan longitude di tabel Sites.'
+    return
+  }
+
+  startGps()
+}
+
+// Menghitung jarak antara posisi pekerja dan titik proyek
+const calculateDistance = (
+  lat1,
+  lon1,
+  lat2,
+  lon2
+) => {
+  const earthRadius = 6371000
+
+  const toRadians = value => value * Math.PI / 180
+
+  const dLat = toRadians(lat2 - lat1)
+  const dLon = toRadians(lon2 - lon1)
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRadians(lat1)) *
+    Math.cos(toRadians(lat2)) *
+    Math.sin(dLon / 2) ** 2
+
+  return earthRadius * 2 * Math.atan2(
+    Math.sqrt(a),
+    Math.sqrt(1 - a)
+  )
+}
+
+// Meminta lokasi perangkat dan memperbarui status GPS
+const startGps = () => {
+  if (!navigator.geolocation) {
+    workerLocationStatus.value = 'error'
+    gpsMessage.value =
+      'Browser ini tidak mendukung GPS.'
+    return
+  }
+
+  if (
+    siteLatitude.value === null ||
+    siteLongitude.value === null
+  ) {
+    workerLocationStatus.value = 'error'
+    gpsMessage.value =
+      'Koordinat proyek belum valid.'
+    return
+  }
+
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId)
+    watchId = null
+  }
+
+  workerLocationStatus.value = 'checking'
+  gpsMessage.value =
+    'Meminta izin lokasi perangkat...'
+
+  watchId = navigator.geolocation.watchPosition(
+    position => {
+      workerLatitude.value = position.coords.latitude
+      workerLongitude.value = position.coords.longitude
+      gpsAccuracy.value = position.coords.accuracy
+
+      distanceToSite.value = calculateDistance(
+        workerLatitude.value,
+        workerLongitude.value,
+        siteLatitude.value,
+        siteLongitude.value
+      )
+
+      // Tolak status di dalam area jika akurasi terlalu buruk
+      if (position.coords.accuracy > 500) {
+        workerLocationStatus.value = 'checking'
+        gpsMessage.value =
+          `Akurasi GPS belum memadai (±${Math.round(position.coords.accuracy)} meter). Coba ke area terbuka.`
+        return
+      }
+
+      if (distanceToSite.value <= siteRadius.value) {
+        workerLocationStatus.value = 'inside'
+        gpsMessage.value =
+          'Lokasi terdeteksi di dalam radius proyek.'
+      } else {
+        workerLocationStatus.value = 'outside'
+        gpsMessage.value =
+          'Lokasi terdeteksi di luar radius proyek.'
+      }
+    },
+
+    error => {
+      workerLocationStatus.value = 'error'
+
+      if (error.code === 1) {
+        gpsMessage.value =
+          'Izin lokasi ditolak. Aktifkan izin lokasi untuk situs ini.'
+      } else if (error.code === 2) {
+        gpsMessage.value =
+          'Lokasi tidak dapat ditemukan. Periksa GPS perangkat.'
+      } else if (error.code === 3) {
+        gpsMessage.value =
+          'Permintaan GPS habis waktu. Coba periksa lokasi lagi.'
+      } else {
+        gpsMessage.value =
+          'Gagal mendapatkan lokasi perangkat.'
+      }
+    },
+
+    {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 20000
+    }
+  )
+}
+
+const retryGps = () => {
+  startGps()
+}
+
+// ==================================================
+// KAMERA DAN SIMULASI FOTO
+// ==================================================
+
 const isCameraModalOpen = ref(false)
 const isCapturing = ref(false)
 const isAbsenSuccess = ref(false)
+const isPhotoCaptured = ref(false)
 const lastAbsenTime = ref('')
 
-// Ref untuk menangkap elemen html video asli laptop/HP
 const videoRef = ref(null)
-let streamInstance = null
 
-// Daftarkan fungsi pemancar sinyal pindah halaman ke App.vue
-const emit = defineEmits(['absen-complete', 'logout-trigger'])
+let streamInstance = null
+let captureTimerId = null
+let closeCameraTimerId = null
 
 const openCameraModal = async () => {
   isAbsenSuccess.value = false
   isCameraModalOpen.value = true
 
-  // Tunggu sampai Vue selesai menggambar elemen modal & video di layar
   await nextTick()
 
   try {
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'user' } 
-      })
-      streamInstance = stream
+    if (
+      navigator.mediaDevices &&
+      navigator.mediaDevices.getUserMedia
+    ) {
+      streamInstance =
+        await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'user'
+          },
+          audio: false
+        })
+
       if (videoRef.value) {
-        videoRef.value.srcObject = stream
+        videoRef.value.srcObject = streamInstance
       }
+    } else {
+      alert(
+        'Browser tidak mendukung akses kamera.'
+      )
     }
-  } catch (err) {
-    console.error("Gagal mengakses kamera depan asli: ", err)
+  } catch (error) {
+    console.error('Gagal mengakses kamera:', error)
+
+    alert(
+      'Kamera tidak dapat diakses. Periksa izin kamera browser.'
+    )
   }
 }
-
 
 const closeCameraModal = () => {
   if (isCapturing.value) return
+
   isCameraModalOpen.value = false
-  
-  // Mematikan lampu kamera asli saat jendela ditutup agar hemat RAM & privasi aman
+
   if (streamInstance) {
-    streamInstance.getTracks().forEach(track => track.stop())
+    streamInstance.getTracks().forEach(track => {
+      track.stop()
+    })
+
+    streamInstance = null
+  }
+
+  if (videoRef.value) {
+    videoRef.value.srcObject = null
   }
 }
 
-// State baru untuk mengecek apakah pekerja sudah mengambil foto wajah atau belum
-const isPhotoCaptured = ref(false)
-
-// Simulasi Aksi Deteksi Wajah dan Pengambilan Foto (Modal otomatis tertutup setelah sukses)
+// Ini masih simulasi persiapan foto, belum deteksi wajah sungguhan
 const triggerCaptureAbsen = () => {
+  if (!streamInstance) {
+    alert('Aktifkan kamera terlebih dahulu.')
+    return
+  }
+
   isCapturing.value = true
-  
-  setTimeout(() => {
+
+  captureTimerId = setTimeout(() => {
     isCapturing.value = false
-    isAbsenSuccess.value = true // Untuk memunculkan spanduk notifikasi waktu
-    isPhotoCaptured.value = true // Menandai bahwa foto lokal sudah siap!
-    
-    const now = new Date()
-    lastAbsenTime.value = now.toLocaleTimeString('id-ID', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    }) + ' WIB'
-    
-    // Beri jeda 1 detik agar pekerja melihat status sukses terverifikasi di modal, 
-    // lalu tutup modal kamera secara otomatis agar pekerja bisa menekan tombol ABSEN utama di luar.
-    setTimeout(() => {
+    isAbsenSuccess.value = true
+    isPhotoCaptured.value = true
+
+    lastAbsenTime.value =
+      new Date().toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      }) + ' WIB'
+
+    closeCameraTimerId = setTimeout(() => {
       closeCameraModal()
     }, 1000)
-    
   }, 1200)
 }
 
-// Fungsi tombol ABSEN utama untuk mengirim data ke server tiruan dan pindah ke halaman sukses
+// Belum menyimpan absensi ke tabel attendances
 const handleFinalSubmitAbsen = () => {
+  if (!isInsideArea.value) {
+    alert(
+      'Kamu harus berada di dalam area proyek untuk absen.'
+    )
+    return
+  }
+
+  if (!isPhotoCaptured.value) {
+    alert(
+      'Aktifkan kamera dan siapkan foto terlebih dahulu.'
+    )
+    return
+  }
+
   emit('absen-complete')
 }
 
-// Fungsi tombol keluar untuk memicu perpindahan layar balik ke Login
 const handleLogoutClick = () => {
   emit('logout-trigger')
 }
 
-// Keyboard Accessibility: Tutup Modal / Drawer dengan tombol Escape
-const handleGlobalKeydown = (event) => {
-  if (event.key === 'Escape') {
-    if (isCameraModalOpen.value) {
-      closeCameraModal()
-    } else if (isDrawerOpen.value) {
-      closeDrawer()
-    }
-  }
-}
+// ==================================================
+// JAM
+// ==================================================
 
-// Waktu Server Reaktif
 const serverTime = ref(new Date())
 const serverTimeString = ref('')
+
 let timerId = null
 
 const updateClock = () => {
-  serverTime.value = new Date(serverTime.value.getTime() + 1000)
-  const d = serverTime.value
-  const months = ['JAN', 'FEB', 'MAR', 'APR', 'MEI', 'JUN', 'JUL', 'AGT', 'SEP', 'OKT', 'NOV', 'DES']
-  const dateNum = d.getDate()
-  const monthName = months[d.getMonth()]
-  const year = d.getFullYear()
-  const hours = String(d.getHours()).padStart(2, '0')
-  const minutes = String(d.getMinutes()).padStart(2, '0')
-  const seconds = String(d.getSeconds()).padStart(2, '0')
-  serverTimeString.value = `${dateNum} ${monthName} ${year} ${hours}:${minutes}:${seconds} WIB`
+  serverTime.value = new Date()
+
+  const formatted = serverTime.value.toLocaleString(
+    'id-ID',
+    {
+      timeZone: 'Asia/Jakarta',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }
+  )
+
+  serverTimeString.value = `${formatted} WIB`
 }
 
-onMounted(() => {
-  window.addEventListener('keydown', handleGlobalKeydown)
+// ==================================================
+// EVENT DAN PEMBERSIHAN
+// ==================================================
+
+const handleGlobalKeydown = event => {
+  if (
+    event.key === 'Escape' &&
+    isCameraModalOpen.value
+  ) {
+    closeCameraModal()
+  }
+}
+
+onMounted(async () => {
+  window.addEventListener(
+    'keydown',
+    handleGlobalKeydown
+  )
+
+  updateClock()
   timerId = setInterval(updateClock, 1000)
+
+  await loadSite()
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleGlobalKeydown)
+  window.removeEventListener(
+    'keydown',
+    handleGlobalKeydown
+  )
+
   if (timerId) clearInterval(timerId)
+
+  if (watchId !== null && navigator.geolocation) {
+    navigator.geolocation.clearWatch(watchId)
+  }
+
+  if (captureTimerId) {
+    clearTimeout(captureTimerId)
+  }
+
+  if (closeCameraTimerId) {
+    clearTimeout(closeCameraTimerId)
+  }
+
+  if (streamInstance) {
+    streamInstance.getTracks().forEach(track => {
+      track.stop()
+    })
+  }
 })
 </script>
 
 <template>
   <div class="mobile-shell">
-    <!-- Header Atas: Navigasi Menu & Tombol Keluar -->
+    <!-- HEADER -->
     <header class="topbar-nav">
       <nav class="topbar-content" aria-label="Navigasi Header">
-        
-        <!-- Tombol Keluar Sesuai Kode Asal -->
         <div class="logout-group">
-          <!-- Memanggil fungsi JavaScript handleLogoutClick agar sinkronisasi emit berjalan 100% lancar -->
-          <a 
-            href="#keluar" 
-            class="btn btn-secondary" 
+          <button
+            type="button"
+            class="btn btn-secondary"
             style="padding: 4px 16px; min-height: 36px; font-size: 14px;"
-            @click.prevent="handleLogoutClick"
+            @click="handleLogoutClick"
           >
-            <img :src="iconLogOut" alt="" class="icon-logout-svg" width="16" height="16" aria-hidden="true" />
+            <img
+              :src="iconLogOut"
+              alt=""
+              width="16"
+              height="16"
+              aria-hidden="true"
+            />
             <span>Keluar</span>
-          </a>
+          </button>
         </div>
       </nav>
     </header>
 
-    <!-- Header Identitas: Logo dan Info Lokasi Proyek -->
+    <!-- IDENTITAS PROYEK -->
     <header class="identity-header">
       <figure class="brand-figure">
         <img
           width="100"
           height="100"
           :src="logoPantauHadir"
-          alt="Logo Pantau Hadir - Sistem Absensi Pekerja Proyek"
+          alt="Logo Pantau Hadir"
           class="brand-logo"
         />
       </figure>
+
       <hgroup class="brand-hgroup">
-        <h1 class="company-name">PT. Jalan Baru</h1>
-        <p class="site-location">SITE A - Kalimalang</p>
+        <h1 class="company-name">
+          PT. Jalan Baru
+        </h1>
+
+        <p class="site-location">
+          {{ siteName }}
+          <span v-if="siteAddress">
+            - {{ siteAddress }}
+          </span>
+        </p>
       </hgroup>
     </header>
 
-    <!-- Konten Utama: Layar Presensi Mandiri -->
+    <!-- KONTEN DASHBOARD -->
     <main class="main-content">
       <section class="worker-greeting-card">
-        <h2 class="worker-name">HALO, CAHYADI!</h2>
+        <h2 class="worker-name">
+          HALO, {{ workerName.toUpperCase() }}!
+        </h2>
+
+        <p class="worker-meta">
+          NIK: {{ workerNik }}
+        </p>
+
         <p class="project-status">
-          <span class="status-label">STATUS:</span>
-          <strong 
-            :class="workerLocationStatus === 'inside' ? 'status-value' : 'status-value-outside'"
-            style="padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: 700;"
+          <span class="status-label">
+            STATUS:
+          </span>
+
+          <strong
+            :class="{
+              'status-value':
+                workerLocationStatus === 'inside',
+              'status-value-outside':
+                workerLocationStatus === 'outside',
+              'status-value-checking':
+                workerLocationStatus === 'checking',
+              'status-value-error':
+                workerLocationStatus === 'error'
+            }"
           >
-            <img :src="iconMapPinCheck" alt="" width="18" height="18" aria-hidden="true" />
-            {{ workerLocationStatus === 'inside' ? 'DI DALAM AREA PROYEK' : 'DI LUAR AREA PROYEK' }}
+            <img
+              :src="iconMapPinCheck"
+              alt=""
+              width="18"
+              height="18"
+              aria-hidden="true"
+            />
+
+            {{ locationStatusText }}
           </strong>
         </p>
 
+        <p
+          class="gps-message"
+          role="status"
+          aria-live="polite"
+        >
+          {{ gpsMessage }}
+        </p>
 
-        <!-- Notifikasi Konfirmasi Kehadiran Hari Ini Jika Sudah Absen -->
-        <div v-if="isAbsenSuccess" class="attendance-confirmed-banner" role="status" aria-live="polite">
-          <img :src="iconCircleCheck" alt="" width="20" height="20" aria-hidden="true" />
-          <span>Absensi terverifikasi pukul {{ lastAbsenTime }}</span>
+        <p
+          v-if="distanceToSite !== null"
+          class="gps-detail"
+        >
+          Jarak ke titik proyek:
+          <strong>
+            {{ Math.round(distanceToSite) }} meter
+          </strong>
+        </p>
+
+        <p
+          v-if="gpsAccuracy !== null"
+          class="gps-detail"
+        >
+          Akurasi GPS:
+          ±{{ Math.round(gpsAccuracy) }} meter
+        </p>
+
+        <p class="gps-detail">
+          Radius geofencing: {{ siteRadius }} meter
+        </p>
+
+        <button
+          v-if="
+            workerLocationStatus === 'error' ||
+            workerLocationStatus === 'checking'
+          "
+          type="button"
+          class="btn btn-secondary gps-retry-btn"
+          @click="retryGps"
+        >
+          Periksa Lokasi Lagi
+        </button>
+
+        <!-- INFORMASI FOTO -->
+        <div
+          v-if="isPhotoCaptured"
+          class="attendance-confirmed-banner"
+          role="status"
+          aria-live="polite"
+        >
+          <img
+            :src="iconCircleCheck"
+            alt=""
+            width="20"
+            height="20"
+            aria-hidden="true"
+          />
+
+          <span>
+            Foto disiapkan pukul {{ lastAbsenTime }}
+          </span>
         </div>
       </section>
 
-      <!-- Area Kamera & Interaksi Pengambilan Presensi -->
+      <!-- KAMERA DAN TOMBOL ABSEN -->
       <div class="attendance-action-card">
-        <!-- Hapus form submit handler agar tombol tidak rebutan fungsi -->
         <div class="attendance-form">
           <fieldset class="camera-fieldset">
-            <legend class="camera-legend">Pratinjau Kamera Depan</legend>
+            <legend class="camera-legend">
+              Pratinjau Kamera Depan
+            </legend>
+
             <p class="fieldset-content">
               <button
                 type="button"
                 class="btn btn-secondary btn-block preview-camera-btn"
                 @click="openCameraModal"
               >
-                {{ isPhotoCaptured ? '✓ FOTO WAJAH SIAP (KLIK UNTUK ULANGI)' : 'TEKAN UNTUK AKTIFKAN KAMERA DEPAN' }}
+                {{
+                  isPhotoCaptured
+                    ? '✓ FOTO WAJAH SIAP (KLIK UNTUK ULANGI)'
+                    : 'TEKAN UNTUK AKTIFKAN KAMERA DEPAN'
+                }}
               </button>
             </p>
           </fieldset>
 
           <p class="submit-action-row">
-            <!-- Tombol ABSEN Utama sekarang memiliki LOGIKA GANDA:
-                Hanya menyala jika pekerja di DALAM area proyek AND sudah sukses mengambil foto wajah! -->
             <button
               type="button"
               class="btn btn-primary btn-block submit-absen-btn"
-              :disabled="workerLocationStatus !== 'inside' || !isPhotoCaptured"
+              :disabled="!isAttendanceReady"
               @click="handleFinalSubmitAbsen"
             >
               ABSEN
-              <img :src="iconScanFace" alt="" width="24" height="24" aria-hidden="true" />
+
+              <img
+                :src="iconScanFace"
+                alt=""
+                width="24"
+                height="24"
+                aria-hidden="true"
+              />
             </button>
+          </p>
+
+          <p
+            v-if="!isAttendanceReady"
+            class="attendance-hint"
+          >
+            Tombol ABSEN hanya aktif jika GPS menunjukkan
+            kamu berada di dalam radius proyek dan foto
+            sudah disiapkan.
           </p>
         </div>
       </div>
-
     </main>
 
-    <!-- Footer Sistem -->
+    <!-- WAKTU -->
     <footer class="mobile-footer">
       <p class="server-time-copy">
-        WAKTU SERVER:
-        <time :datetime="serverTime.toISOString()">{{ serverTimeString }}</time>
-        <!-- dikerjakan oleh Kintan Aulia -->
+        WAKTU:
+        <time :datetime="serverTime.toISOString()">
+          {{ serverTimeString }}
+        </time>
       </p>
     </footer>
-    
-    <!-- Pop-up Modal Kamera Deteksi Wajah -->
+
+    <!-- MODAL KAMERA -->
     <div
       v-if="isCameraModalOpen"
       class="modal-backdrop"
@@ -249,76 +741,121 @@ onUnmounted(() => {
       aria-modal="true"
       aria-labelledby="modal-camera-title"
     >
-      <div class="modal-dialog-box" @click.stop>
+      <div
+        class="modal-dialog-box"
+        @click.stop
+      >
         <div class="modal-top">
-          <h3 id="modal-camera-title" class="modal-heading">Simulasi Deteksi Wajah</h3>
+          <h3
+            id="modal-camera-title"
+            class="modal-heading"
+          >
+            Simulasi Deteksi Wajah
+          </h3>
+
           <button
             type="button"
             class="modal-close-icon-btn"
             aria-label="Tutup modal kamera"
+            :disabled="isCapturing"
             @click="closeCameraModal"
           >
-            <img :src="iconCircleX" alt="" width="26" height="26" aria-hidden="true" />
+            <img
+              :src="iconCircleX"
+              alt=""
+              width="26"
+              height="26"
+              aria-hidden="true"
+            />
           </button>
         </div>
 
         <p class="modal-instruction">
-          Pastikan wajah berada di dalam bingkai dan terlihat jelas tanpa masker.
+          Pastikan wajah berada di dalam bingkai dan
+          terlihat jelas.
         </p>
 
-        <!-- Bingkai Kamera Aktif Menggunakan Kelas .camera-frame Sesuai style.css -->
-        <!-- GANTI STRUKTUR AREA BINGKAI KAMERA LAMA DENGAN INI -->
         <div class="camera-frame-container">
-          <div class="camera-frame" style="position: relative; overflow: hidden; background: #000;">
-            
-            <!-- Tag video utama dengan posisi absolut menutupi bingkai secara penuh -->
-            <video 
-              ref="videoRef" 
-              autoplay 
-              playsinline 
+          <div
+            class="camera-frame"
+            style="position: relative; overflow: hidden; background: #000; width: 100%; height: 320px;"
+          >
+            <video
+              ref="videoRef"
+              autoplay
+              playsinline
               muted
               style="width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; z-index: 1;"
             ></video>
 
-            <!-- Lapisan reticle oval dan teks status diletakkan di atas video (z-index: 2) -->
-            <div class="camera-viewfinder" style="position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
-              
-              <!-- Reticle Oval Panduan Wajah -->
-              <div style="flex: 1; display: flex; align-items: center; justify-content: center;">
-                <div class="face-guide-ring" :class="{ 'is-capturing': isCapturing, 'is-success': isAbsenSuccess }">
+            <div
+              class="camera-viewfinder"
+              style="position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; justify-content: space-between; height: 100%;"
+            >
+              <div class="face-guide-wrapper">
+                <div
+                  class="face-guide-ring"
+                  :class="{
+                    'is-capturing': isCapturing,
+                    'is-success': isAbsenSuccess
+                  }"
+                >
                   <div class="reticle top-left"></div>
                   <div class="reticle top-right"></div>
                   <div class="reticle bottom-left"></div>
                   <div class="reticle bottom-right"></div>
-                  <div v-if="isCapturing" class="scan-beam"></div>
+
+                  <div
+                    v-if="isCapturing"
+                    class="scan-beam"
+                  ></div>
                 </div>
               </div>
 
-              <!-- Status Informasi Kamera di Bagian Bawah Bingkai -->
-              <div class="camera-overlay-info" style="margin-bottom: 16px; text-align: center;">
-                <span v-if="!isCapturing && !isAbsenSuccess" class="camera-status-tag ready">
-                  Kamera Siap: Site A Kalimalang
+              <div class="camera-overlay-info">
+                <span
+                  v-if="!isCapturing && !isAbsenSuccess"
+                  class="camera-status-tag ready"
+                >
+                  Kamera Siap
                 </span>
-                <span v-else-if="isCapturing" class="camera-status-tag scanning">
-                  Memindai Biometrik Wajah...
+
+                <span
+                  v-else-if="isCapturing"
+                  class="camera-status-tag scanning"
+                >
+                  Memproses simulasi...
                 </span>
-                <span v-else class="camera-status-tag verified">
-                  Wajah Terverifikasi 100%
+
+                <span
+                  v-else
+                  class="camera-status-tag verified"
+                >
+                  Foto Disiapkan
                 </span>
               </div>
-
             </div>
           </div>
         </div>
 
-
-        <!-- Feedback & Tombol Aksi Kamera -->
         <div class="modal-actions-wrapper">
-          <div v-if="isAbsenSuccess" class="success-callout" role="alert">
-            <img :src="iconCircleCheck" alt="" width="24" height="24" aria-hidden="true" />
+          <div
+            v-if="isAbsenSuccess"
+            class="success-callout"
+            role="status"
+          >
+            <img
+              :src="iconCircleCheck"
+              alt=""
+              width="24"
+              height="24"
+              aria-hidden="true"
+            />
+
             <div>
-              <strong>Absensi Berhasil Terkirim!</strong>
-              <p>Waktu server: {{ lastAbsenTime }}</p>
+              <strong>Foto berhasil disiapkan</strong>
+              <p>Waktu: {{ lastAbsenTime }}</p>
+              <p>Belum disimpan ke attendances.</p>
             </div>
           </div>
 
@@ -330,9 +867,23 @@ onUnmounted(() => {
               :disabled="isCapturing"
               @click="triggerCaptureAbsen"
             >
-              <img :src="iconScanFace" alt="" width="20" height="20" aria-hidden="true" />
-              <span>{{ isCapturing ? 'Memproses Pengenalan Wajah...' : 'Ambil Foto & Simpan Absen' }}</span>
+              <img
+                :src="iconScanFace"
+                alt=""
+                width="20"
+                height="20"
+                aria-hidden="true"
+              />
+
+              <span>
+                {{
+                  isCapturing
+                    ? 'Memproses...'
+                    : 'Ambil Foto & Siapkan Absen'
+                }}
+              </span>
             </button>
+
             <button
               v-else
               type="button"
@@ -358,12 +909,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* -----------------------------------------------------------------------------
-   KOMPONEN DASHBOARD PEKERJA — MOBILE FRAME (FIGMA MODUL 5)
-   Terintegrasi dengan design token & style.css
-   ----------------------------------------------------------------------------- */
-
-/* Header Atas Navigasi */
+/* HEADER */
 .topbar-nav {
   background-color: var(--color-header, #f58220);
   padding: var(--space-8, 8px) var(--space-16, 16px);
@@ -375,46 +921,16 @@ onUnmounted(() => {
 .topbar-content {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   min-height: 44px;
 }
 
-/* Tombol Hamburger */
-.btn-hamburger {
-  display: inline-flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 5px;
-  width: 44px;
-  height: 44px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 8px;
-  border-radius: var(--radius-sm, 8px);
-}
-
-.btn-hamburger:focus-visible {
-  outline: 3px solid var(--color-primary, #080264);
-  outline-offset: 2px;
-}
-
-.hamburger-bar {
-  display: block;
-  width: 24px;
-  height: 3px;
-  background-color: var(--color-primary, #080264);
-  border-radius: 2px;
-}
-
-/* Keluar Link */
 .logout-group {
   display: flex;
   align-items: center;
 }
 
-/* Header Identitas */
+/* IDENTITAS */
 .identity-header {
   padding: var(--space-24, 24px) var(--space-16, 16px) var(--space-16, 16px);
   display: flex;
@@ -453,7 +969,7 @@ onUnmounted(() => {
   margin: 4px 0 0;
 }
 
-/* Konten Utama */
+/* KONTEN UTAMA */
 .main-content {
   flex: 1;
   padding: var(--space-16, 16px);
@@ -462,7 +978,7 @@ onUnmounted(() => {
   gap: var(--space-24, 24px);
 }
 
-/* Kartu Salam Pekerja */
+/* KARTU SALAM */
 .worker-greeting-card {
   background: #f7f8fc;
   border: 1.5px solid var(--color-sidebar, #c5c9e8);
@@ -479,6 +995,12 @@ onUnmounted(() => {
   letter-spacing: 0.02em;
 }
 
+.worker-meta {
+  margin: 4px 0 10px;
+  color: #555;
+  font-size: 13px;
+}
+
 .project-status {
   display: inline-flex;
   align-items: center;
@@ -491,23 +1013,54 @@ onUnmounted(() => {
 
 .status-label {
   font-weight: 600;
-  color: #555555;
+  color: #555;
 }
 
-.status-value {
+.status-value,
+.status-value-outside,
+.status-value-checking,
+.status-value-error {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background-color: var(--color-status-hadir-bg, #c8f5d0);
-  color: var(--color-status-hadir-text, #0b7a28);
   padding: 4px 10px;
-  border-radius: var(--radius-pill, 999px);
+  border-radius: 999px;
   font-size: 13px;
   font-weight: 700;
 }
 
-.inline-pin-icon {
-  flex-shrink: 0;
+.status-value {
+  background-color: var(--color-status-hadir-bg, #c8f5d0);
+  color: var(--color-status-hadir-text, #0b7a28);
+}
+
+.status-value-outside,
+.status-value-error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status-value-checking {
+  background: #fef3c7;
+  color: #854d0e;
+}
+
+.gps-message {
+  margin: 12px 0 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.gps-detail {
+  margin: 5px 0;
+  font-size: 12px;
+  color: #555;
+}
+
+.gps-retry-btn {
+  margin-top: 8px;
+  min-height: 40px;
 }
 
 .attendance-confirmed-banner {
@@ -525,9 +1078,9 @@ onUnmounted(() => {
   color: var(--color-status-hadir-text, #0b7a28);
 }
 
-/* Kartu Aksi Absensi */
+/* KARTU AKSI */
 .attendance-action-card {
-  background: var(--color-surface, #ffffff);
+  background: var(--color-surface, #fff);
   border: 2px solid var(--color-primary, #080264);
   border-radius: var(--radius-xl, 24px);
   padding: var(--space-24, 24px) var(--space-16, 16px);
@@ -581,7 +1134,24 @@ onUnmounted(() => {
   box-shadow: 0 4px 14px rgba(8, 2, 100, 0.25);
 }
 
-/* Footer Waktu Server */
+.submit-absen-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.attendance-hint {
+  margin: 0;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* FOOTER */
+.mobile-footer {
+  text-align: center;
+  padding: 12px 16px;
+}
+
 .server-time-copy {
   margin: 0;
   font-size: 13px;
@@ -589,147 +1159,7 @@ onUnmounted(() => {
   letter-spacing: 0.02em;
 }
 
-/* -----------------------------------------------------------------------------
-   DRAWER NAVIGATION (AKSI 1)
-   ----------------------------------------------------------------------------- */
-.drawer-backdrop {
-  position: fixed;
-  inset: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  z-index: 100;
-  backdrop-filter: blur(2px);
-}
-
-.drawer-panel {
-  position: fixed;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: min(320px, 85vw);
-  background-color: var(--color-surface, #ffffff);
-  z-index: 101;
-  display: flex;
-  flex-direction: column;
-  box-shadow: var(--shadow-panel, 0 12px 32px rgba(8, 12, 100, 0.2));
-  transform: translateX(-100%);
-  transition: transform 0.25s ease-in-out;
-}
-
-.drawer-panel.is-open {
-  transform: translateX(0);
-}
-
-.drawer-header {
-  background-color: var(--color-sidebar, #c5c9e8);
-  padding: var(--space-24, 24px) var(--space-16, 16px);
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-8, 8px);
-}
-
-.drawer-user-info {
-  display: flex;
-  align-items: center;
-  gap: var(--space-16, 16px);
-}
-
-.drawer-worker-name {
-  font-size: 16px;
-  font-weight: 800;
-  color: var(--color-primary, #080264);
-  margin: 0;
-}
-
-.drawer-worker-meta {
-  font-size: 12px;
-  color: #333333;
-  margin: 2px 0 0;
-}
-
-.btn-close-drawer {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 8px;
-  min-width: 44px;
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-pill, 999px);
-}
-
-.btn-close-drawer:focus-visible {
-  outline: 3px solid var(--color-primary, #080264);
-  outline-offset: 2px;
-}
-
-.drawer-nav {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: var(--space-16, 16px) 0;
-}
-
-.drawer-menu-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.drawer-menu-item {
-  margin: 2px 0;
-}
-
-.drawer-menu-link {
-  display: flex;
-  align-items: center;
-  gap: var(--space-16, 16px);
-  padding: 12px var(--space-24, 24px);
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--color-primary, #080264);
-  text-decoration: none;
-  min-height: 48px;
-  transition: background-color 0.15s ease;
-}
-
-.drawer-menu-item.is-active .drawer-menu-link,
-.drawer-menu-link:hover {
-  background-color: rgba(8, 2, 100, 0.08);
-  font-weight: 700;
-}
-
-.drawer-menu-link:focus-visible {
-  outline: 3px solid var(--color-secondary, #5d2deb);
-  outline-offset: -2px;
-}
-
-.drawer-footer-action {
-  padding: var(--space-16, 16px) var(--space-24, 24px);
-  border-top: 1px solid #e0e2ec;
-}
-
-.drawer-logout-link {
-  display: flex;
-  align-items: center;
-  gap: var(--space-16, 16px);
-  color: var(--color-error, #e22121);
-  text-decoration: none;
-  font-weight: 700;
-  font-size: 15px;
-  min-height: 44px;
-}
-
-.drawer-logout-link:hover {
-  text-decoration: underline;
-}
-
-/* -----------------------------------------------------------------------------
-   MODAL KAMERA DETEKSI WAJAH (AKSI 2)
-   ----------------------------------------------------------------------------- */
+/* MODAL KAMERA */
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -743,7 +1173,7 @@ onUnmounted(() => {
 }
 
 .modal-dialog-box {
-  background: var(--color-surface, #ffffff);
+  background: var(--color-surface, #fff);
   border-radius: var(--radius-xl, 24px);
   width: min(390px, 100%);
   max-height: 90vh;
@@ -781,37 +1211,30 @@ onUnmounted(() => {
   border-radius: var(--radius-pill, 999px);
 }
 
-.modal-close-icon-btn:focus-visible {
-  outline: 3px solid var(--color-secondary, #5d2deb);
-  outline-offset: 2px;
-}
-
 .modal-instruction {
   font-size: 13px;
-  color: #555555;
+  color: #555;
   margin: 0;
   text-align: center;
 }
 
-/* Wadah Camera-Frame */
 .camera-frame-container {
   display: flex;
   justify-content: center;
   margin: var(--space-8, 8px) 0;
 }
 
-/* Viewfinder di dalam .camera-frame */
 .camera-viewfinder {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
   padding: var(--space-16, 16px);
   overflow: hidden;
   border-radius: inherit;
+}
+
+.face-guide-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .face-guide-ring {
@@ -837,12 +1260,11 @@ onUnmounted(() => {
   border-width: 3px;
 }
 
-/* Sudut Reticle Kamera */
 .reticle {
   position: absolute;
   width: 16px;
   height: 16px;
-  border-color: #ffffff;
+  border-color: #fff;
   border-style: solid;
 }
 
@@ -870,14 +1292,13 @@ onUnmounted(() => {
   border-width: 0 3px 3px 0;
 }
 
-/* Scanning Beam Animation */
 .scan-beam {
   position: absolute;
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, transparent, var(--color-accent, #f58220), transparent);
-  box-shadow: 0 0 8px var(--color-accent, #f58220);
+  background: linear-gradient(90deg, transparent, #f58220, transparent);
+  box-shadow: 0 0 8px #f58220;
   animation: scanMove 1.2s infinite alternate ease-in-out;
 }
 
@@ -885,14 +1306,15 @@ onUnmounted(() => {
   0% {
     top: 10%;
   }
+
   100% {
     top: 90%;
   }
 }
 
 .camera-overlay-info {
-  margin-top: auto;
-  padding-top: var(--space-8, 8px);
+  margin-bottom: 16px;
+  text-align: center;
 }
 
 .camera-status-tag {
@@ -905,18 +1327,17 @@ onUnmounted(() => {
 }
 
 .camera-status-tag.ready {
-  color: #ffffff;
+  color: #fff;
 }
 
 .camera-status-tag.scanning {
-  color: var(--color-accent, #f58220);
+  color: #f58220;
 }
 
 .camera-status-tag.verified {
-  color: var(--color-success, #00e81a);
+  color: #00e81a;
 }
 
-/* Modal Actions */
 .modal-actions-wrapper {
   display: flex;
   flex-direction: column;

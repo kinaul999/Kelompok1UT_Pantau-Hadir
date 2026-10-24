@@ -1,5 +1,6 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { supabase } from '../lib/supabase'
 
 import logoPantauHadir from '../assets/images/logo-pantau-hadir.svg'
 import imgKonstruksi from '../assets/images/images-konstruksi-biru-removebg-preview.png'
@@ -39,28 +40,65 @@ const handleTambahPekerjaClick = () => {
   emit('tambah-pekerja-trigger')
 }
 
-const workers = ref([
-  { no: '01', nik: 'P0001', name: 'Bambang Cahyadi', site: 'Site A' },
-  { no: '02', nik: 'P0002', name: 'Budiharso Supriando', site: 'Site A' },
-  { no: '03', nik: 'P0003', name: 'Alexander Hamilton', site: 'Site B' },
-  { no: '04', nik: 'P0004', name: 'Thomas Jefferson', site: 'Site C' },
-  { no: '05', nik: 'P0005', name: 'Ahmad Supriyadi', site: 'Site D' },
-  { no: '06', nik: 'P0006', name: 'Dedi Rahmadi', site: 'Site A' },
-  { no: '07', nik: 'P0007', name: 'Budi Santoso', site: 'Site B' },
-  { no: '08', nik: 'P0008', name: 'Suryo Nugroho', site: 'Site C' },
-  { no: '09', nik: 'P0009', name: 'Eko Prasetyo', site: 'Site D' },
-  { no: '10', nik: 'P0010', name: 'Reza Kurniawan', site: 'Site A' },
-  { no: '11', nik: 'P0011', name: 'Hendra Wijaya', site: 'Site B' },
-  { no: '12', nik: 'P0012', name: 'Muhammad Agung', site: 'Site C' },
-  { no: '13', nik: 'P0013', name: 'Rizky Ramadhan', site: 'Site D' },
-  { no: '14', nik: 'P0014', name: 'Agus Setiawan', site: 'Site A' },
-  { no: '15', nik: 'P0015', name: 'Fajar Hidayat', site: 'Site B' },
-  { no: '16', nik: 'P0016', name: 'Gilang Gemilang', site: 'Site C' },
-  { no: '17', nik: 'P0017', name: 'Hadi Pratama', site: 'Site D' },
-  { no: '18', nik: 'P0018', name: 'Indra Lesmana', site: 'Site A' },
-  { no: '19', nik: 'P0019', name: 'Joko Susilo', site: 'Site B' },
-  { no: '20', nik: 'P0020', name: 'Lukman Hakim', site: 'Site C' }
-])
+
+const workers = ref([])
+const isLoadingWorkers = ref(false)
+const workersError = ref('')
+
+
+const loadWorkers = async () => {
+  isLoadingWorkers.value = true
+  workersError.value = ''
+
+  try {
+    // Ambil data pekerja
+    const { data: workerData, error: workerError } = await supabase
+      .from('Workers')
+      .select('id, nik, name, site_id, status, created_at')
+      .order('created_at', { ascending: false })
+
+    if (workerError) throw workerError
+
+    // Ambil data site
+    const { data: siteData, error: siteError } = await supabase
+      .from('Sites')
+      .select('id, name')
+
+    if (siteError) throw siteError
+
+    // Cocokkan ID site dengan site_id pekerja
+    const siteMap = new Map(
+      (siteData || []).map(site => [
+        String(site.id).trim().toLowerCase(),
+        site.name
+      ])
+    )
+
+    workers.value = (workerData || []).map(worker => ({
+      ...worker,
+      site:
+        siteMap.get(
+          String(worker.site_id || '').trim().toLowerCase()
+        ) || 'Site belum ditentukan'
+    }))
+
+    console.log('Data Sites:', siteData)
+    console.log('Data Workers:', workers.value)
+
+    currentPage.value = 1
+  } catch (error) {
+    console.error('Gagal mengambil data pekerja:', error)
+
+    workersError.value =
+      'Data pekerja gagal dimuat. Periksa koneksi atau izin akses Supabase.'
+  } finally {
+    isLoadingWorkers.value = false
+  }
+}
+
+
+onMounted(loadWorkers)
+
 
 const searchQuery = ref('')
 const selectedSite = ref('')
@@ -112,15 +150,37 @@ const selectSite = (site) => {
   currentPage.value = 1
 }
 
-const handleDelete = (worker) => {
-  const confirmDelete = window.confirm(`Hapus data pekerja ${worker.name} (${worker.nik})?`)
-  if (confirmDelete) {
-    workers.value = workers.value.filter(w => w.nik !== worker.nik)
+
+const handleDelete = async (worker) => {
+  const confirmDelete = window.confirm(
+    `Hapus data pekerja ${worker.name} (${worker.nik})?`
+  )
+
+  if (!confirmDelete) return
+
+  try {
+    const { error } = await supabase
+      .from('Workers')
+      .delete()
+      .eq('id', worker.id)
+
+    if (error) throw error
+
+    workers.value = workers.value.filter(
+      w => w.id !== worker.id
+    )
+
     if (currentPage.value > totalPages.value) {
       currentPage.value = totalPages.value
     }
+
+    alert('Data pekerja berhasil dihapus.')
+  } catch (error) {
+    console.error('Gagal menghapus pekerja:', error)
+    alert('Data gagal dihapus. Periksa izin DELETE pada Supabase.')
   }
 }
+
 
 const handleEdit = (worker) => {
   const newName = window.prompt('Ubah Nama Pekerja:', worker.name)
@@ -303,8 +363,19 @@ const handleExport = () => {
           </div>
         </div>
 
+        <p v-if="isLoadingWorkers" role="status">
+  Memuat data pekerja dari Supabase...
+</p>
+
+<p v-else-if="workersError" class="cell-empty" role="alert">
+  {{ workersError }}
+  <button type="button" @click="loadWorkers">
+    Coba lagi
+  </button>
+</p>
+
         <!-- TABEL DATA PEKERJA -->
-        <div class="table-card">
+        <div v-if="!isLoadingWorkers && !workersError" class="table-card">
           <table class="worker-table">
             <thead>
               <tr>
@@ -312,17 +383,17 @@ const handleExport = () => {
                 <th scope="col" class="col-nik">NIK</th>
                 <th scope="col" class="col-name">Nama Pekerja</th>
                 <th scope="col" class="col-site">Site</th>
-                <th scope="col" class="col-pass">Kata Sandi</th>
                 <th scope="col" class="col-aksi">Aksi</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="worker in paginatedWorkers" :key="worker.nik">
-                <td class="cell-no">{{ worker.no }}</td>
+             <tr v-for="(worker, index) in paginatedWorkers" :key="worker.id">
+  <td class="cell-no">
+    {{ String((currentPage - 1) * itemsPerPage + index + 1).padStart(2, '0') }}
+  </td>
                 <td class="cell-nik">{{ worker.nik }}</td>
                 <td class="cell-name">{{ worker.name }}</td>
                 <td class="cell-site">{{ worker.site }}</td>
-                <td class="cell-pass">********</td>
                 <td class="cell-aksi">
                   <button
                     type="button"
@@ -341,7 +412,7 @@ const handleExport = () => {
                 </td>
               </tr>
               <tr v-if="paginatedWorkers.length === 0">
-                <td colspan="6" class="cell-empty">
+                <td colspan="5" class="cell-empty">
                   Tidak ada data pekerja yang sesuai dengan kriteria pencarian.
                 </td>
               </tr>

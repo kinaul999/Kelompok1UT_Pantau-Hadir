@@ -9,7 +9,6 @@ import imgKonstruksi from '../assets/images/images-konstruksi-biru-removebg-prev
 
 const emit = defineEmits(['admin-login-success', 'admin-logout-trigger'])
 
-const idPerusahaan = ref('')
 const nik = ref('')
 const password = ref('')
 const showPassword = ref(false)
@@ -19,9 +18,9 @@ const togglePasswordVisibility = () => {
 }
 
 const handleLogin = () => {
-  if (!idPerusahaan.value.trim() || !nik.value.trim() || !password.value.trim()) return
+  if (!nik.value.trim() || !password.value.trim()) return
+
   emit('admin-login-success', {
-    idPerusahaan: idPerusahaan.value.trim(),
     nik: nik.value.trim(),
     password: password.value
   })
@@ -63,20 +62,6 @@ const goToHome = () => {
         <p class="card-subtitle">Masukkan NIK dan password Anda untuk mengakses sistem</p>
 
         <form class="login-form" @submit.prevent="handleLogin">
-          <div class="form-group">
-            <label for="admin-id-perusahaan" class="form-label">ID Perusahaan</label>
-            <input
-              id="admin-id-perusahaan"
-              v-model="idPerusahaan"
-              type="text"
-              name="id-perusahaan"
-              class="form-input"
-              placeholder="Masukkan ID Perusahaan Anda"
-              autocomplete="username"
-              autofocus
-              required
-            />
-          </div>
         
           <div class="form-group">
             <label for="admin-nik" class="form-label">NIK</label>

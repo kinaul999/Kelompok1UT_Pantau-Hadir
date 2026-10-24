@@ -7,7 +7,6 @@ import iconEyeOff from '../assets/icons/eye-off.svg'
 import logoPantauHadir from '../assets/images/logo-pantau-hadir.svg'
 import imgKonstruksi from '../assets/images/images-konstruksi-biru.jpg'
 
-const idPerusahaan = ref('')
 const nik = ref('')
 const kataSandi = ref('')
 const showPassword = ref(false)
@@ -19,9 +18,10 @@ const togglePassword = () => {
 }
 
 const handleLogin = () => {
+  if (!nik.value.trim() || !kataSandi.value.trim()) return
+
   emit('login-success', {
-    idPerusahaan: idPerusahaan.value,
-    nik: nik.value,
+    nik: nik.value.trim(),
     kataSandi: kataSandi.value
   })
 }
@@ -50,19 +50,6 @@ const handleLogin = () => {
       <h1 class="h1 text-center login-title">MASUK</h1>
 
       <form class="stack-16" @submit.prevent="handleLogin">
-        <div class="field">
-          <label for="id-perusahaan" class="label">ID Perusahaan</label>
-          <input
-            id="id-perusahaan"
-            v-model.trim="idPerusahaan"
-            type="text"
-            name="id-perusahaan"
-            class="input"
-            placeholder="Masukkan ID Perusahaan"
-            required
-            autofocus
-          />
-        </div>
 
         <div class="field">
           <label for="nik" class="label">NIK</label>

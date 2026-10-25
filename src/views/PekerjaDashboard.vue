@@ -1,4 +1,3 @@
-
 <script setup>
 import {
   ref,
@@ -29,9 +28,11 @@ const emit = defineEmits([
   'logout-trigger'
 ])
 
-// ==================================================
+const handleLogoutClick = () => {
+  emit('logout-trigger')
+}
+
 // IDENTITAS PEKERJA
-// ==================================================
 
 const workerName = computed(() => {
   return props.worker?.name || 'Pekerja'
@@ -41,9 +42,7 @@ const workerNik = computed(() => {
   return props.worker?.nik || '-'
 })
 
-// ==================================================
 // INFORMASI SITE DAN GEOFENCING
-// ==================================================
 
 const siteName = ref('Memuat lokasi proyek...')
 const siteAddress = ref('')
@@ -51,6 +50,7 @@ const siteAddress = ref('')
 const siteLatitude = ref(null)
 const siteLongitude = ref(null)
 const siteRadius = ref(500)
+const geofenceEnabled = ref(true)
 
 const workerLocationStatus = ref('checking')
 const gpsMessage = ref('Memeriksa lokasi perangkat...')
@@ -59,14 +59,35 @@ const workerLatitude = ref(null)
 const workerLongitude = ref(null)
 const distanceToSite = ref(null)
 const gpsAccuracy = ref(null)
+const isSubmittingAttendance = ref(false)
 
 let watchId = null
 
 const isInsideArea = computed(() => {
+  if (!geofenceEnabled.value) {
+    return (
+      workerLocationStatus.value !== 'error' &&
+      workerLatitude.value !== null &&
+      workerLongitude.value !== null
+    )
+  }
+
   return workerLocationStatus.value === 'inside'
 })
 
 const locationStatusText = computed(() => {
+  if (workerLocationStatus.value === 'error') {
+    return 'LOKASI TIDAK TERSEDIA'
+  }
+
+  if (
+    !geofenceEnabled.value &&
+    workerLatitude.value !== null &&
+    workerLongitude.value !== null
+  ) {
+    return 'MODE DEMO AKTIF'
+  }
+
   if (workerLocationStatus.value === 'inside') {
     return 'DI DALAM AREA PROYEK'
   }
@@ -75,18 +96,9 @@ const locationStatusText = computed(() => {
     return 'DI LUAR AREA PROYEK'
   }
 
-  if (workerLocationStatus.value === 'error') {
-    return 'LOKASI TIDAK TERSEDIA'
-  }
-
   return 'MEMERIKSA LOKASI'
 })
 
-const isAttendanceReady = computed(() => {
-  return isInsideArea.value && isPhotoCaptured.value
-})
-
-// Membaca angka dari beberapa kemungkinan nama kolom
 const getNumberFromSite = (site, names) => {
   for (const name of names) {
     const value = site?.[name]
@@ -104,12 +116,10 @@ const getNumberFromSite = (site, names) => {
   return null
 }
 
-// Mengambil informasi site berdasarkan site_id pekerja
 const loadSite = async () => {
   if (!props.worker?.site_id) {
     siteName.value = 'Site belum ditentukan'
-    gpsMessage.value =
-      'Data site pekerja belum tersedia.'
+    gpsMessage.value = 'Data site pekerja belum tersedia.'
     workerLocationStatus.value = 'error'
     return
   }
@@ -138,7 +148,10 @@ const loadSite = async () => {
     return
   }
 
-  // Sesuaikan dengan nama kolom yang tersedia
+  // FALSE berarti mode demo tanpa validasi radius.
+  // TRUE berarti geofencing tetap diberlakukan.
+  geofenceEnabled.value = data.geofence_enabled !== false
+
   siteName.value =
     data.name ||
     data.site_name ||
@@ -181,13 +194,16 @@ const loadSite = async () => {
     siteRadius.value = radius
   }
 
+  // Koordinat proyek wajib valid hanya jika geofencing aktif.
   if (
-    siteLatitude.value === null ||
-    siteLongitude.value === null ||
-    Math.abs(siteLatitude.value) > 90 ||
-    Math.abs(siteLongitude.value) > 180
+    geofenceEnabled.value &&
+    (
+      siteLatitude.value === null ||
+      siteLongitude.value === null ||
+      Math.abs(siteLatitude.value) > 90 ||
+      Math.abs(siteLongitude.value) > 180
+    )
   ) {
-    siteName.value = siteName.value
     workerLocationStatus.value = 'error'
     gpsMessage.value =
       'Koordinat proyek belum tersedia atau tidak valid. Periksa kolom latitude dan longitude di tabel Sites.'
@@ -197,7 +213,6 @@ const loadSite = async () => {
   startGps()
 }
 
-// Menghitung jarak antara posisi pekerja dan titik proyek
 const calculateDistance = (
   lat1,
   lon1,
@@ -205,7 +220,6 @@ const calculateDistance = (
   lon2
 ) => {
   const earthRadius = 6371000
-
   const toRadians = value => value * Math.PI / 180
 
   const dLat = toRadians(lat2 - lat1)
@@ -223,22 +237,25 @@ const calculateDistance = (
   )
 }
 
-// Meminta lokasi perangkat dan memperbarui status GPS
+// GPS PERANGKAT
+
 const startGps = () => {
   if (!navigator.geolocation) {
     workerLocationStatus.value = 'error'
-    gpsMessage.value =
-      'Browser ini tidak mendukung GPS.'
+    gpsMessage.value = 'Browser ini tidak mendukung GPS.'
     return
   }
 
+  // Koordinat proyek dibutuhkan hanya jika geofencing aktif.
   if (
-    siteLatitude.value === null ||
-    siteLongitude.value === null
+    geofenceEnabled.value &&
+    (
+      siteLatitude.value === null ||
+      siteLongitude.value === null
+    )
   ) {
     workerLocationStatus.value = 'error'
-    gpsMessage.value =
-      'Koordinat proyek belum valid.'
+    gpsMessage.value = 'Koordinat proyek belum valid.'
     return
   }
 
@@ -248,23 +265,42 @@ const startGps = () => {
   }
 
   workerLocationStatus.value = 'checking'
-  gpsMessage.value =
-    'Meminta izin lokasi perangkat...'
+  gpsMessage.value = 'Meminta izin lokasi perangkat...'
 
   watchId = navigator.geolocation.watchPosition(
     position => {
+      // Tetap mengambil koordinat asli perangkat,
+      // termasuk ketika pekerja menggunakan SITE DEMO.
       workerLatitude.value = position.coords.latitude
       workerLongitude.value = position.coords.longitude
       gpsAccuracy.value = position.coords.accuracy
 
-      distanceToSite.value = calculateDistance(
-        workerLatitude.value,
-        workerLongitude.value,
-        siteLatitude.value,
-        siteLongitude.value
-      )
+      if (
+        geofenceEnabled.value &&
+        siteLatitude.value !== null &&
+        siteLongitude.value !== null
+      ) {
+        distanceToSite.value = calculateDistance(
+          workerLatitude.value,
+          workerLongitude.value,
+          siteLatitude.value,
+          siteLongitude.value
+        )
+      } else {
+        distanceToSite.value = null
+      }
 
-      // Tolak status di dalam area jika akurasi terlalu buruk
+      // MODE DEMO:
+      // Tidak membandingkan jarak dengan radius proyek,
+      // tetapi koordinat GPS perangkat tetap direkam.
+      if (!geofenceEnabled.value) {
+        workerLocationStatus.value = 'inside'
+        gpsMessage.value =
+          'Mode demo aktif. Lokasi GPS asli tetap direkam, tetapi radius proyek tidak divalidasi.'
+        return
+      }
+
+      // VALIDASI GPS UNTUK SITE BIASA
       if (position.coords.accuracy > 500) {
         workerLocationStatus.value = 'checking'
         gpsMessage.value =
@@ -313,9 +349,7 @@ const retryGps = () => {
   startGps()
 }
 
-// ==================================================
-// KAMERA DAN SIMULASI FOTO
-// ==================================================
+// KAMERA DAN FOTO ABSENSI
 
 const isCameraModalOpen = ref(false)
 const isCapturing = ref(false)
@@ -324,57 +358,104 @@ const isPhotoCaptured = ref(false)
 const lastAbsenTime = ref('')
 
 const videoRef = ref(null)
+const canvasRef = ref(null)
+
+const attendanceRecord = ref(null)
+const photoBlob = ref(null)
 
 let streamInstance = null
-let captureTimerId = null
-let closeCameraTimerId = null
 
-const openCameraModal = async () => {
-  isAbsenSuccess.value = false
-  isCameraModalOpen.value = true
-
-  await nextTick()
-
-  try {
-    if (
-      navigator.mediaDevices &&
-      navigator.mediaDevices.getUserMedia
-    ) {
-      streamInstance =
-        await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: 'user'
-          },
-          audio: false
-        })
-
-      if (videoRef.value) {
-        videoRef.value.srcObject = streamInstance
-      }
-    } else {
-      alert(
-        'Browser tidak mendukung akses kamera.'
-      )
-    }
-  } catch (error) {
-    console.error('Gagal mengakses kamera:', error)
-
-    alert(
-      'Kamera tidak dapat diakses. Periksa izin kamera browser.'
-    )
+const attendanceActionType = computed(() => {
+  if (!attendanceRecord.value?.check_in) {
+    return 'check_in'
   }
+
+  if (!attendanceRecord.value?.check_out) {
+    return 'check_out'
+  }
+
+  return 'completed'
+})
+
+const attendanceActionLabel = computed(() => {
+  if (attendanceActionType.value === 'check_in') {
+    return 'ABSEN MASUK'
+  }
+
+  if (attendanceActionType.value === 'check_out') {
+    return 'ABSEN PULANG'
+  }
+
+  return 'ABSENSI HARI INI SELESAI'
+})
+
+const isAttendanceReady = computed(() => {
+  return (
+    (!geofenceEnabled.value || isInsideArea.value) &&
+    workerLatitude.value !== null &&
+    workerLongitude.value !== null &&
+    isPhotoCaptured.value &&
+    attendanceActionType.value !== 'completed' &&
+    !isSubmittingAttendance.value
+  )
+})
+
+// TANGGAL DAN WAKTU WIB
+
+const getWibDate = (date = new Date()) => {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date)
+
+  const part = type =>
+    parts.find(item => item.type === type)?.value
+
+  return `${part('year')}-${part('month')}-${part('day')}`
 }
 
-const closeCameraModal = () => {
-  if (isCapturing.value) return
+const getWibTime = (date = new Date()) => {
+  return new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23'
+  }).format(date)
+}
 
-  isCameraModalOpen.value = false
+// MEMERIKSA ABSENSI HARI INI
 
+const loadTodayAttendance = async () => {
+  if (!props.worker?.id) return
+
+  const today = getWibDate()
+
+  const { data, error } = await supabase
+    .from('attendances')
+    .select('*')
+    .eq('worker_id', props.worker.id)
+    .eq('attendance_date', today)
+    .maybeSingle()
+
+  if (error) {
+    console.error(
+      'Gagal memeriksa absensi hari ini:',
+      error
+    )
+    return
+  }
+
+  attendanceRecord.value = data
+}
+
+// MENGHENTIKAN KAMERA
+
+const stopCamera = () => {
   if (streamInstance) {
-    streamInstance.getTracks().forEach(track => {
-      track.stop()
-    })
-
+    streamInstance.getTracks().forEach(track => track.stop())
     streamInstance = null
   }
 
@@ -383,59 +464,331 @@ const closeCameraModal = () => {
   }
 }
 
-// Ini masih simulasi persiapan foto, belum deteksi wajah sungguhan
-const triggerCaptureAbsen = () => {
-  if (!streamInstance) {
+// MEMBUKA KAMERA
+
+const openCameraModal = async () => {
+  if (attendanceActionType.value === 'completed') {
+    alert('Absensi hari ini sudah lengkap.')
+    return
+  }
+
+  isAbsenSuccess.value = false
+  isCameraModalOpen.value = true
+
+  await nextTick()
+
+  try {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error(
+        'Browser tidak mendukung kamera. Gunakan HTTPS atau localhost.'
+      )
+    }
+
+    stopCamera()
+
+    streamInstance =
+      await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'user'
+        },
+        audio: false
+      })
+
+    if (videoRef.value) {
+      videoRef.value.srcObject = streamInstance
+      await videoRef.value.play()
+    }
+  } catch (error) {
+    console.error('Gagal mengakses kamera:', error)
+
+    alert(
+      `Kamera tidak dapat diakses: ${error.message || 'Periksa izin kamera browser.'}`
+    )
+
+    closeCameraModal()
+  }
+}
+
+const closeCameraModal = () => {
+  if (isCapturing.value) return
+
+  isCameraModalOpen.value = false
+  stopCamera()
+}
+
+// MENGAMBIL FOTO DARI KAMERA
+
+const triggerCaptureAbsen = async () => {
+  if (!streamInstance || !videoRef.value) {
     alert('Aktifkan kamera terlebih dahulu.')
     return
   }
 
+  const video = videoRef.value
+
+  if (!video.videoWidth || !video.videoHeight) {
+    alert(
+      'Kamera belum siap. Tunggu beberapa detik lalu coba lagi.'
+    )
+    return
+  }
+
   isCapturing.value = true
+  isAbsenSuccess.value = false
 
-  captureTimerId = setTimeout(() => {
-    isCapturing.value = false
-    isAbsenSuccess.value = true
+  try {
+    const canvas = canvasRef.value
+
+    if (!canvas) {
+      throw new Error(
+        'Area pengambilan foto tidak ditemukan.'
+      )
+    }
+
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+
+    const context = canvas.getContext('2d')
+
+    if (!context) {
+      throw new Error('Gagal memproses foto kamera.')
+    }
+
+    context.drawImage(
+      video,
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    )
+
+    photoBlob.value = await new Promise(
+      (resolve, reject) => {
+        canvas.toBlob(
+          blob => {
+            if (blob) {
+              resolve(blob)
+            } else {
+              reject(
+                new Error('Gagal membuat file foto. Silakan ulangi.')
+              )
+            }
+          },
+          'image/jpeg',
+          0.85
+        )
+      }
+    )
+
     isPhotoCaptured.value = true
+    isAbsenSuccess.value = true
+    lastAbsenTime.value = `${getWibTime()} WIB`
+  } catch (error) {
+    console.error('Gagal mengambil foto:', error)
 
-    lastAbsenTime.value =
-      new Date().toLocaleTimeString('id-ID', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      }) + ' WIB'
+    photoBlob.value = null
+    isPhotoCaptured.value = false
 
-    closeCameraTimerId = setTimeout(() => {
-      closeCameraModal()
-    }, 1000)
-  }, 1200)
+    alert(error.message || 'Foto gagal diambil.')
+  } finally {
+    isCapturing.value = false
+  }
 }
 
-// Belum menyimpan absensi ke tabel attendances
-const handleFinalSubmitAbsen = () => {
-  if (!isInsideArea.value) {
+// MENGUNGGAH FOTO KE SUPABASE STORAGE
+
+const uploadAttendancePhoto = async (
+  blob,
+  actionType,
+  attendanceDate
+) => {
+  const safeWorkerId = String(props.worker.id)
+
+  const path =
+    `${safeWorkerId}/${attendanceDate}/${actionType}-${Date.now()}.jpg`
+
+  const { error } = await supabase.storage
+    .from('attendance-photos')
+    .upload(path, blob, {
+      contentType: 'image/jpeg',
+      upsert: false
+    })
+
+  if (error) {
+    throw error
+  }
+
+  return path
+}
+
+// MENYIMPAN ABSEN MASUK ATAU PULANG
+
+const handleFinalSubmitAbsen = async () => {
+  if (isSubmittingAttendance.value) return
+
+  if (!props.worker?.id || !props.worker?.site_id) {
+    alert('Data pekerja atau lokasi proyek tidak lengkap.')
+    return
+  }
+
+  // Site biasa wajib berada di dalam radius proyek.
+  // SITE DEMO tidak melakukan pemeriksaan radius.
+  if (geofenceEnabled.value && !isInsideArea.value) {
     alert(
       'Kamu harus berada di dalam area proyek untuk absen.'
     )
     return
   }
 
-  if (!isPhotoCaptured.value) {
+  if (!isPhotoCaptured.value || !photoBlob.value) {
+    alert('Ambil foto langsung dari kamera terlebih dahulu.')
+    return
+  }
+
+  // GPS asli tetap wajib tersedia, termasuk pada SITE DEMO.
+  if (
+    workerLatitude.value === null ||
+    workerLongitude.value === null
+  ) {
     alert(
-      'Aktifkan kamera dan siapkan foto terlebih dahulu.'
+      'Lokasi GPS belum tersedia. Periksa lokasi terlebih dahulu.'
     )
     return
   }
 
-  emit('absen-complete')
+  isSubmittingAttendance.value = true
+
+  try {
+    const now = new Date()
+    const attendanceDate = getWibDate(now)
+    const actionType = attendanceActionType.value
+
+    if (actionType === 'completed') {
+      alert('Absensi masuk dan pulang hari ini sudah lengkap.')
+      return
+    }
+
+    // Upload foto sesuai jenis absensi.
+    const uploadedPhotoPath = await uploadAttendancePhoto(
+      photoBlob.value,
+      actionType,
+      attendanceDate
+    )
+
+    if (actionType === 'check_in') {
+      const time = getWibTime(now)
+      const [hour, minute, second] = time
+        .split(':')
+        .map(Number)
+
+      const attendanceStatus =
+        hour > 8 ||
+        (hour === 8 && (minute > 0 || second > 0))
+          ? 'Terlambat'
+          : 'Hadir'
+
+      const { data, error } = await supabase
+        .from('attendances')
+        .insert({
+          worker_id: props.worker.id,
+          site_id: props.worker.site_id,
+          attendance_date: attendanceDate,
+          check_in: now.toISOString(),
+          check_in_photo: uploadedPhotoPath,
+          latitude: workerLatitude.value,
+          longitude: workerLongitude.value,
+          status: attendanceStatus
+        })
+        .select('*')
+        .single()
+
+      if (error) throw error
+
+      attendanceRecord.value = data
+
+      alert(
+        `Absensi masuk berhasil disimpan. Status: ${attendanceStatus}`
+      )
+    } else {
+      // Pastikan data absensi masuk tersedia.
+      if (
+        !attendanceRecord.value?.id ||
+        !attendanceRecord.value?.check_in
+      ) {
+        await loadTodayAttendance()
+      }
+
+      const currentRecord = attendanceRecord.value
+
+      if (
+        !currentRecord?.id ||
+        !currentRecord.check_in
+      ) {
+        throw new Error(
+          'Absensi masuk belum ditemukan. Silakan muat ulang halaman.'
+        )
+      }
+
+      if (currentRecord.check_out) {
+        alert('Absensi pulang hari ini sudah tercatat.')
+        return
+      }
+
+      const { data, error } = await supabase
+        .from('attendances')
+        .update({
+          check_out: now.toISOString(),
+          check_out_photo: uploadedPhotoPath
+        })
+        .eq('id', currentRecord.id)
+        .is('check_out', null)
+        .select('*')
+        .maybeSingle()
+
+      if (error) throw error
+
+      if (!data) {
+        throw new Error(
+          'Absensi pulang belum tersimpan. Muat ulang halaman dan periksa status absensi.'
+        )
+      }
+
+      attendanceRecord.value = data
+
+      alert('Absensi pulang berhasil disimpan.')
+    }
+
+    isPhotoCaptured.value = false
+    photoBlob.value = null
+    isAbsenSuccess.value = false
+    isCameraModalOpen.value = false
+
+    stopCamera()
+
+    emit('absen-complete')
+  } catch (error) {
+    console.error(
+      'Kesalahan saat menyimpan absensi:',
+      error
+    )
+
+    if (error.code === '23505') {
+      await loadTodayAttendance()
+
+      alert(
+        'Absensi hari ini sudah tercatat. Status absensi diperbarui.'
+      )
+    } else {
+      alert(
+        `Absensi gagal disimpan: ${error.message || 'Terjadi kesalahan.'}`
+      )
+    }
+  } finally {
+    isSubmittingAttendance.value = false
+  }
 }
 
-const handleLogoutClick = () => {
-  emit('logout-trigger')
-}
-
-// ==================================================
 // JAM
-// ==================================================
 
 const serverTime = ref(new Date())
 const serverTimeString = ref('')
@@ -462,9 +815,7 @@ const updateClock = () => {
   serverTimeString.value = `${formatted} WIB`
 }
 
-// ==================================================
 // EVENT DAN PEMBERSIHAN
-// ==================================================
 
 const handleGlobalKeydown = event => {
   if (
@@ -485,6 +836,7 @@ onMounted(async () => {
   timerId = setInterval(updateClock, 1000)
 
   await loadSite()
+  await loadTodayAttendance()
 })
 
 onUnmounted(() => {
@@ -493,25 +845,15 @@ onUnmounted(() => {
     handleGlobalKeydown
   )
 
-  if (timerId) clearInterval(timerId)
+  if (timerId) {
+    clearInterval(timerId)
+  }
 
   if (watchId !== null && navigator.geolocation) {
     navigator.geolocation.clearWatch(watchId)
   }
 
-  if (captureTimerId) {
-    clearTimeout(captureTimerId)
-  }
-
-  if (closeCameraTimerId) {
-    clearTimeout(closeCameraTimerId)
-  }
-
-  if (streamInstance) {
-    streamInstance.getTracks().forEach(track => {
-      track.stop()
-    })
-  }
+  stopCamera()
 })
 </script>
 
@@ -699,7 +1041,7 @@ onUnmounted(() => {
               :disabled="!isAttendanceReady"
               @click="handleFinalSubmitAbsen"
             >
-              ABSEN
+              {{ attendanceActionLabel }}
 
               <img
                 :src="iconScanFace"
@@ -715,9 +1057,11 @@ onUnmounted(() => {
             v-if="!isAttendanceReady"
             class="attendance-hint"
           >
-            Tombol ABSEN hanya aktif jika GPS menunjukkan
-            kamu berada di dalam radius proyek dan foto
-            sudah disiapkan.
+            {{
+              geofenceEnabled
+                ? 'Tombol ABSEN aktif jika GPS berada di dalam radius proyek dan foto sudah disiapkan.'
+                : 'Mode demo aktif: GPS asli tetap dicatat, radius proyek tidak divalidasi. Ambil foto untuk melanjutkan absensi.'
+            }}
           </p>
         </div>
       </div>
@@ -750,7 +1094,7 @@ onUnmounted(() => {
             id="modal-camera-title"
             class="modal-heading"
           >
-            Simulasi Deteksi Wajah
+            Ambil Foto Absensi
           </h3>
 
           <button
@@ -788,6 +1132,11 @@ onUnmounted(() => {
               style="width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; z-index: 1;"
             ></video>
 
+            <canvas
+              ref="canvasRef"
+              style="display: none;"
+            ></canvas>
+
             <div
               class="camera-viewfinder"
               style="position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; justify-content: space-between; height: 100%;"
@@ -824,7 +1173,7 @@ onUnmounted(() => {
                   v-else-if="isCapturing"
                   class="camera-status-tag scanning"
                 >
-                  Memproses simulasi...
+                  Foto...
                 </span>
 
                 <span
@@ -855,7 +1204,9 @@ onUnmounted(() => {
             <div>
               <strong>Foto berhasil disiapkan</strong>
               <p>Waktu: {{ lastAbsenTime }}</p>
-              <p>Belum disimpan ke attendances.</p>
+              <p>
+                Foto akan disimpan saat kamu menekan tombol absensi.
+              </p>
             </div>
           </div>
 

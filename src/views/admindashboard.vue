@@ -319,7 +319,6 @@ onUnmounted(() => {
       </header>
 
       <main class="dashboard-content">
-        <section class="dashboard-section">
         <section class="dashboard-content">
            <!-- BANNER PERINGATAN RESPONSIVITAS (Ditempatkan di dalam konten utama agar rapi saat dibuka di HP) -->
           <div class="mobile-warning-banner" role="alert">

@@ -122,6 +122,14 @@ const emit = defineEmits([
   
       <main class="dashboard-content">
         <section class="dashboard-content">
+           <!-- BANNER PERINGATAN RESPONSIVITAS (Ditempatkan di dalam konten utama agar rapi saat dibuka di HP) -->
+          <div class="mobile-warning-banner" role="alert">
+            <span class="warning-icon">🖥️</span>
+            <p>
+              <strong>Info Sistem:</strong> Alur manajemen Admin optimal dibuka di perangkat <strong>Desktop/Laptop</strong> untuk visualisasi data yang maksimal.
+            </p>
+          </div>
+
           <div class="page-heading">
             <div>
               <span class="eyebrow">RINGKASAN AKTIVITAS</span>
@@ -203,6 +211,37 @@ const emit = defineEmits([
 </template>
 
 <style scoped>
+/* --- BANNER PERINGATAN MOBILE --- */
+.mobile-warning-banner {
+  display: none; 
+  background-color: #fff9db; 
+  border: 1px solid #fab005;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 24px; /* Memberikan jarak bawah ke bagian heading */
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.mobile-warning-banner p {
+  color: #664d03;
+  font-size: 14px;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.warning-icon {
+  font-size: 20px;
+}
+
+/* --- MEDIA QUERY: AKTIFKAN HANYA DI LAYAR MOBILE/TABLET --- */
+@media (max-width: 1024px) {
+  .mobile-warning-banner {
+    display: flex; 
+  }
+}
+
 .dashboard-shell {
   display: grid;
   grid-template-columns: var(--sidebar-width, 260px) minmax(0, 1fr);

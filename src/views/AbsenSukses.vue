@@ -1,6 +1,5 @@
 <script setup>
 import { ref, computed } from 'vue'
-
 import iconLogOut from '../assets/icons/log-out.svg'
 import iconArrowLeft from '../assets/icons/arrow-left.svg'
 import iconArrowRight from '../assets/icons/arrow-right.svg'
@@ -27,9 +26,7 @@ const historyRecords = ref([
 
 const pageSize = 5
 const currentPage = ref(1)
-
 const totalPages = computed(() => Math.ceil(historyRecords.value.length / pageSize))
-
 const paginatedRecords = computed(() => {
   const start = (currentPage.value - 1) * pageSize
   return historyRecords.value.slice(start, start + pageSize)
@@ -54,7 +51,7 @@ const nextPage = () => {
       <nav aria-label="Navigasi Header">
         <button
           type="button"
-          class="btn-exit"
+          class="btn btn-secondary btn-exit-compact"
           aria-label="Keluar ke halaman utama"
           @click="handleLogoutClick"
         >
@@ -89,7 +86,6 @@ const nextPage = () => {
 
         <div class="history-card">
           <h2 class="history-title">Riwayat Absensi</h2>
-
           <div class="table-container">
             <table class="history-table">
               <thead>
@@ -155,34 +151,11 @@ const nextPage = () => {
   padding: 16px 20px;
 }
 
-.btn-exit {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background-color: var(--color-surface, #ffffff);
-  color: var(--color-primary, #080264);
-  border: 2px solid var(--color-primary, #080264);
-  border-radius: var(--radius-sm, 8px);
-  padding: 8px 18px;
-  font-family: inherit;
+/* Penyesuaian kecil agar tombol standar .btn tetap compact di header */
+.btn-exit-compact {
+  min-height: 36px;
+  padding: 6px 16px;
   font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background-color 0.15s ease, transform 0.1s ease;
-}
-
-.btn-exit:hover {
-  background-color: #f2f4fa;
-}
-
-.btn-exit:focus-visible {
-  outline: 3px solid var(--color-primary, #080264);
-  outline-offset: 2px;
-}
-
-.btn-exit:active {
-  transform: scale(0.98);
 }
 
 .success-main {
@@ -203,9 +176,9 @@ const nextPage = () => {
   width: 136px;
   height: 136px;
   border-radius: 50%;
-  background-color: #00d616;
-  border: 2.5px solid #00d616;
-  outline: 2px solid #00d616;
+  background-color: var(--color-success, #00e81a);
+  border: 2.5px solid var(--color-success, #00e81a);
+  outline: 2px solid var(--color-success, #00e81a);
   outline-offset: 4px;
   display: flex;
   align-items: center;

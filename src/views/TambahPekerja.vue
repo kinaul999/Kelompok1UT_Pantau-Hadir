@@ -102,6 +102,18 @@ const handleSubmit = async () => {
 
     if (error) throw error
 
+    // Bersihkan dari daftar ID/NIK yang pernah dihapus
+    try {
+      const raw = localStorage.getItem('pantau_hadir_deleted_worker_ids')
+      if (raw) {
+        const deletedIds = JSON.parse(raw)
+        const filtered = deletedIds.filter(id => id !== cleanNik)
+        localStorage.setItem('pantau_hadir_deleted_worker_ids', JSON.stringify(filtered))
+      }
+    } catch (e) {
+      console.warn('LocalStorage update warning:', e)
+    }
+
     // UX Toast/Feedback Berhasil disimpan
     alert('✅ Data pekerja berhasil disimpan dan dikaitkan dengan lokasi proyek!')
     emit('save-pekerja')

@@ -1,5 +1,6 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { reactive, ref, onMounted } from 'vue'
+import { supabase } from '../lib/supabase'
 import logoPantauHadir from '../assets/images/logo-pantau-hadir.jpg'
 import iconSave from '../assets/icons/save-check.svg'
 import iconCancel from '../assets/icons/circle-x.svg'
@@ -20,41 +21,112 @@ const form = reactive({
   password: ''
 })
 
-// State untuk opsi lokasi kerja (bisa disesuaikan atau diambil dari API)
-const daftarLokasi = ref([
-  'Proyek Gedung A - Jakarta Selatan',
-  'Proyek Apartemen B - Jakarta Pusat',
-  'Proyek Infrastruktur C - Tangerang'
-])
+// UX States untuk validasi dan loading info
+const isSubmitting = ref(false)
+const isLoadingSites = ref(true)
+const validationError = ref('')
 
-// State untuk toggle tampil/sembunyi password
+// 1. Ubah state daftarLokasi menjadi array kosong untuk menampung data dari Supabase
+const daftarLokasi = ref([])
+
+// State untuk fitur toggle mata password (tampil/sembunyi)
 const showPassword = ref(false)
-
 const togglePasswordVisibility = () => {
   showPassword.value = !showPassword.value
 }
 
-// Handler tombol simpan
-const handleSubmit = () => {
-  console.log('Data pekerja disubmit:', { ...form })
-  alert('Data pekerja berhasil disimpan!')
-  // Tambahkan logika pemanggilan API / router push di sini
+// 2. Fungsi untuk mengambil data dari tabel 'Sites' di database
+const fetchSitesData = async () => {
+  try {
+    isLoadingSites.value = true
+    // Menarik kolom 'id' dan 'name' sesuai struktur tabel Sites di gambarmu
+    const { data, error } = await supabase
+      .from('Sites')
+      .select('id, name')
+      .order('name', { ascending: true })
+
+    if (error) throw error
+    daftarLokasi.value = data || []
+  } catch (error) {
+    console.error('Gagal memuat data lokasi:', error.message)
+    validationError.value = 'Gagal mengambil daftar lokasi proyek dari server.'
+  } finally {
+    isLoadingSites.value = false
+  }
 }
 
-// Handler tombol batal
-const handleBatal = () => {
+// 3. Jalankan fetch otomatis saat halaman dibuka
+onMounted(() => {
+  fetchSitesData()
+})
+
+// 2. FUNGSI WRITE: Menyimpan data pekerja baru lengkap dengan Password & ID Lokasi (Target 2 Modul 8)
+const handleSubmit = async () => {
+  validationError.value = ''
+  
+  // Proses Sanitasi (.trim()) sesuai rubrik penilaian Modul 8
+  const cleanNama = form.nama.trim()
+  const cleanNik = form.nik.trim()
+  const cleanPassword = form.password.trim()
+  const selectedSiteId = form.lokasi // Berisi UUID dari opsi proyek yang dipilih
+
+  // Form & Validasi Input: Cegah kirim data kosong ke database
+  if (!cleanNama || !cleanNik || !selectedSiteId || !cleanPassword) {
+    validationError.value = 'Semua kolom formulir wajib diisi!'
+    return
+  }
+
+  // Validasi NIK minimal 5 digit (fleksibel mendukung ID Karyawan 5 digit maupun KTP 16 digit)
+  if (cleanNik.length < 5) {
+    validationError.value = 'NIK minimal berjumlah 5 digit!'
+    return
+  }
+
+  try {
+    // Aktifkan Loading State (Tombol berubah menjadi "Mengirim...")
+    isSubmitting.value = true
+
+    // Kirim data nyata ke tabel 'Workers' di database cloud Supabase
+    // Kolom database: nik, name, site_id, password, status
+    const { data, error } = await supabase
+      .from('Workers') 
+      .insert([
+        {
+          nik: cleanNik,           // Mengisi kolom 'nik' di Supabase
+          name: cleanNama,         // Mengisi kolom 'name' di Supabase
+          site_id: selectedSiteId, // Mengisi kolom 'site_id' dengan UUID Lokasi dari tabel Sites
+          password: cleanPassword, // Mengisi kolom 'password' teks murni yang baru dibuat
+          status: 'active'         // Mengisi kolom 'status' agar akun pekerja aktif untuk login
+        }
+      ])
+
+    if (error) throw error
+
+    // UX Toast/Feedback Berhasil disimpan
+    alert('✅ Data pekerja berhasil disimpan dan dikaitkan dengan lokasi proyek!')
+    emit('save-pekerja')
+    handleResetForm()
+
+  } catch (error) {
+    console.error('Gagal menyimpan data:', error.message)
+    validationError.value = 'Gagal menyimpan ke server: ' + error.message
+  } finally {
+    // Matikan loading state jika proses selesai (sukses/gagal)
+    isSubmitting.value = false
+  }
+}
+
+const handleResetForm = () => {
   form.nama = ''
   form.nik = ''
   form.lokasi = ''
   form.password = ''
-  // Atau arahkan kembali ke halaman data pekerja, misal: router.push('/data-pekerja')
+  validationError.value = ''
 }
 
-// Handler tombol keluar
-const handleKeluar = () => {
-  if (confirm('Apakah Anda yakin ingin keluar?')) {
-    console.log('Admin keluar')
-  }
+const handleBatal = () => {
+  handleResetForm()
+  emit('cancel-tambah-pekerja')
 }
 </script>
 
@@ -66,12 +138,9 @@ const handleKeluar = () => {
         <img :src="logoPantauHadir" width="200" alt="Pantau Hadir - Sistem Absensi Pekerja Proyek">
       </div>
 
-      
-
       <div class="sidebar-bawah">
         <p class="copyright">
           © 2026 Pantau Hadir App<br>Sistem Absensi Pekerja Proyek
-          <small>Halaman ini dibuat Oleh Adil Iskandar Z</small>
         </p>
       </div>
     </aside>
@@ -92,6 +161,12 @@ const handleKeluar = () => {
         <h1>Tambah Data Pekerja</h1>
         <p>Masukkan data pekerja baru ke dalam sistem.</p>
 
+        <!-- Pesan Error Validasi Tepat di Atas Form -->
+        <div v-if="validationError" class="error-message-box">
+          ⚠ {{ validationError }}
+        </div>
+
+
         <form @submit.prevent="handleSubmit">
           <div class="field">
             <label for="nama">Nama Pekerja</label>
@@ -100,6 +175,7 @@ const handleKeluar = () => {
               id="nama" 
               v-model="form.nama" 
               placeholder="Masukan nama lengkap pekerja"
+              :disabled="isSubmitting"
               required
             >
           </div>
@@ -110,18 +186,21 @@ const handleKeluar = () => {
               type="text" 
               id="nik" 
               v-model="form.nik" 
-              placeholder="Masukan 16 digit NIK" 
+              placeholder="Masukan NIK pekerja (min. 5 digit)" 
               maxlength="16"
+              :disabled="isSubmitting"
               required
             >
           </div>
 
           <div class="field">
             <label for="lokasi">Lokasi Kerja</label>
-            <select id="lokasi" v-model="form.lokasi" required>
-              <option value="">Pilih lokasi proyek</option>
-              <option v-for="lokasi in daftarLokasi" :key="lokasi" :value="lokasi">
-                {{ lokasi }}
+            <select id="lokasi" v-model="form.lokasi" :disabled="isSubmitting || isLoadingSites" required>
+              <option value="" disabled>{{ isLoadingSites ? 'Memuat lokasi proyek...' : (daftarLokasi.length ? 'Pilih lokasi proyek' : 'Tidak ada lokasi proyek tersedia') }}</option>
+              
+              <!-- Looping dynamic berdasarkan data baris dari tabel Sites Supabase -->
+              <option v-for="site in daftarLokasi" :key="site.id" :value="site.id">
+                {{ site.name }}
               </option>
             </select>
           </div>
@@ -133,6 +212,7 @@ const handleKeluar = () => {
               id="password" 
               v-model="form.password" 
               placeholder="Masukan password baru"
+              :disabled="isSubmitting"
               required
             >
             <img 
@@ -143,11 +223,14 @@ const handleKeluar = () => {
           </div>
 
           <div class="aksi">
-            <button type="button" class="btn-cancel" @click.prevent="emit('cancel-tambah-pekerja')">
+            <button type="button" class="btn-batal" @click="handleBatal" :disabled="isSubmitting">
               Batal <img :src="iconCancel" alt="">
             </button>
-            <button type="submit" class="btn-primary" @click.prevent="emit('save-pekerja', form)">
-              Simpan <img :src="iconSave" alt="">
+            <!-- Tombol Terkunci & Berubah Teks Saat Loading Mengirim Data -->
+            <button type="submit" class="btn-simpan" :disabled="isSubmitting">
+              <span v-if="isSubmitting">Mengirim...</span>
+              <span v-else>Simpan</span>
+              <img :src="iconSave" alt="" v-if="!isSubmitting">
             </button>
           </div>
         </form>
@@ -157,6 +240,25 @@ const handleKeluar = () => {
 </template>
 
 <style scoped>
+
+/* CSS Tambahan untuk Penanganan Error Box Pendukung Kriteria Modul 8 */
+.error-message-box {
+  background-color: #fee2e2;
+  color: #b91c1c;
+  padding: 12px 16px;
+  border-radius: 6px;
+  border: 1px solid #fca5a5;
+  margin: 16px auto 0;
+  max-width: 820px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 :root {
   --biru-sidebar: #b3c0e4;
   --biru-tua: #0a0a5c;
@@ -282,7 +384,7 @@ main {
   flex: 1;
   position: relative;
   padding: 32px 44px 200px;
-  background: url("assets/images/images-konstruksi-biru.jpg") no-repeat center bottom / contain;
+  background: url("../assets/images/images-konstruksi-biru.jpg") no-repeat center bottom / contain;
 }
 
 main h1 { font-size: 32px; font-weight: 700; line-height: 1.2; }

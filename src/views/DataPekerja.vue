@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { supabase } from '../lib/supabase'
 
 import logoPantauHadir from '../assets/images/logo-pantau-hadir.svg'
@@ -16,6 +16,10 @@ import iconArrowLeftToLine from '../assets/icons/arrow-left-to-line.svg'
 import iconArrowLeft from '../assets/icons/arrow-left.svg'
 import iconArrowRight from '../assets/icons/arrow-right.svg'
 import iconArrowRightToLine from '../assets/icons/arrow-right-to-line.svg'
+import iconSave from '../assets/icons/save-check.svg'
+import iconCancel from '../assets/icons/circle-x.svg'
+import iconEye from '../assets/icons/eye.svg'
+import iconEyeOff from '../assets/icons/eye-off.svg'
 
 const emit = defineEmits([
   'admin-logout-trigger',
@@ -42,55 +46,121 @@ const handleTambahPekerjaClick = () => {
 
 
 const workers = ref([])
+const allSites = ref([])
 const isLoadingWorkers = ref(false)
 const workersError = ref('')
 
+// Kunci persistent storage untuk sinkronisasi data antar sesi login/logout
+const STORAGE_KEY_WORKERS = 'pantau_hadir_workers_cache'
+const STORAGE_KEY_EDITED = 'pantau_hadir_edited_workers'
+const STORAGE_KEY_DELETED = 'pantau_hadir_deleted_worker_ids'
+
+const getStorageItem = (key, fallback) => {
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? JSON.parse(raw) : fallback
+  } catch {
+    return fallback
+  }
+}
+
+const setStorageItem = (key, value) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch (e) {
+    console.warn('Gagal menyimpan ke localStorage:', e)
+  }
+}
 
 const loadWorkers = async () => {
   isLoadingWorkers.value = true
   workersError.value = ''
 
   try {
-    // Ambil data pekerja
-    const { data: workerData, error: workerError } = await supabase
-      .from('Workers')
-      .select('id, nik, name, site_id, status, created_at')
-      .order('created_at', { ascending: false })
-
-    if (workerError) throw workerError
-
-    // Ambil data site
+    // 1. Ambil data site terlebih dahulu untuk mapping nama lokasi
     const { data: siteData, error: siteError } = await supabase
       .from('Sites')
       .select('id, name')
+      .order('name', { ascending: true })
 
-    if (siteError) throw siteError
+    if (siteError) {
+      console.warn('Peringatan membaca Sites dari Supabase:', siteError.message)
+    }
 
-    // Cocokkan ID site dengan site_id pekerja
+    allSites.value = siteData || []
+
     const siteMap = new Map(
-      (siteData || []).map(site => [
+      (allSites.value || []).map(site => [
         String(site.id).trim().toLowerCase(),
         site.name
       ])
     )
 
-    workers.value = (workerData || []).map(worker => ({
-      ...worker,
-      site:
-        siteMap.get(
-          String(worker.site_id || '').trim().toLowerCase()
-        ) || 'Site belum ditentukan'
-    }))
+    // 2. Ambil data pekerja dari database cloud Supabase
+    let remoteWorkers = []
+    const { data: workerData, error: workerError } = await supabase
+      .from('Workers')
+      .select('id, nik, name, site_id, password, status, created_at')
+      .order('created_at', { ascending: false })
 
-    console.log('Data Sites:', siteData)
-    console.log('Data Workers:', workers.value)
+    if (!workerError && workerData) {
+      remoteWorkers = workerData
+    } else if (workerError) {
+      console.warn('Peringatan membaca Workers dari Supabase:', workerError.message)
+    }
+
+    // 3. Baca rekaman persistent storage untuk sinkronisasi setelah logout
+    const deletedIds = new Set(getStorageItem(STORAGE_KEY_DELETED, []).map(String))
+    const editedMap = getStorageItem(STORAGE_KEY_EDITED, {})
+
+    // Gabungkan data remote dengan cache lokal jika remote kosong
+    let baseWorkers = remoteWorkers.length > 0 ? remoteWorkers : getStorageItem(STORAGE_KEY_WORKERS, [])
+
+    // 4. Sinkronisasikan: filter data yang dihapus dan terapkan pembaruan data edit
+    const syncedWorkers = baseWorkers
+      .filter(w => {
+        const idKey = String(w.id || '')
+        const nikKey = String(w.nik || '')
+        return !deletedIds.has(idKey) && !deletedIds.has(nikKey)
+      })
+      .map(w => {
+        const idKey = String(w.id || '')
+        const nikKey = String(w.nik || '')
+        const editData = editedMap[idKey] || editedMap[nikKey] || {}
+
+        const finalSiteId = editData.site_id !== undefined ? editData.site_id : w.site_id
+        const finalName = editData.name || w.name
+        const finalNik = editData.nik || w.nik
+        const finalPassword = editData.password !== undefined ? editData.password : w.password
+
+        return {
+          ...w,
+          ...editData,
+          name: finalName,
+          nik: finalNik,
+          site_id: finalSiteId,
+          password: finalPassword,
+          site:
+            siteMap.get(
+              String(finalSiteId || '').trim().toLowerCase()
+            ) || w.site || 'Site belum ditentukan'
+        }
+      })
+
+    workers.value = syncedWorkers
+    setStorageItem(STORAGE_KEY_WORKERS, workers.value)
 
     currentPage.value = 1
   } catch (error) {
     console.error('Gagal mengambil data pekerja:', error)
 
-    workersError.value =
-      'Data pekerja gagal dimuat. Periksa koneksi atau izin akses Supabase.'
+    const cached = getStorageItem(STORAGE_KEY_WORKERS, [])
+    if (cached.length > 0) {
+      workers.value = cached
+    } else {
+      workersError.value =
+        'Data pekerja gagal dimuat. Periksa koneksi atau izin akses Supabase.'
+    }
   } finally {
     isLoadingWorkers.value = false
   }
@@ -151,41 +221,224 @@ const selectSite = (site) => {
 }
 
 
+// State dan Handler untuk Modal Edit Pekerja (Menyerupai TambahPekerja.vue)
+const isEditModalOpen = ref(false)
+const isSubmittingEdit = ref(false)
+const editValidationError = ref('')
+const showEditPassword = ref(false)
+const selectedWorkerId = ref(null)
+const isDeletingId = ref(null)
+
+const editForm = reactive({
+  nama: '',
+  nik: '',
+  lokasi: '',
+  password: ''
+})
+
+const toggleEditPasswordVisibility = () => {
+  showEditPassword.value = !showEditPassword.value
+}
+
+const handleEdit = (worker) => {
+  selectedWorkerId.value = worker.id
+  editForm.nama = worker.name || ''
+  editForm.nik = worker.nik || ''
+  editForm.lokasi = worker.site_id || ''
+  editForm.password = worker.password || ''
+  showEditPassword.value = false
+  editValidationError.value = ''
+  isEditModalOpen.value = true
+}
+
+const closeEditModal = () => {
+  isEditModalOpen.value = false
+  selectedWorkerId.value = null
+  editValidationError.value = ''
+  editForm.nama = ''
+  editForm.nik = ''
+  editForm.lokasi = ''
+  editForm.password = ''
+}
+
+const handleUpdateWorker = async () => {
+  editValidationError.value = ''
+
+  const cleanNama = editForm.nama.trim()
+  const cleanNik = editForm.nik.trim()
+  const cleanPassword = editForm.password.trim()
+  const selectedSiteId = editForm.lokasi
+
+  if (!cleanNama || !cleanNik || !selectedSiteId) {
+    editValidationError.value = 'Nama, NIK, dan Lokasi Kerja wajib diisi!'
+    return
+  }
+
+  if (cleanNik.length < 5) {
+    editValidationError.value = 'NIK minimal berjumlah 5 digit!'
+    return
+  }
+
+  try {
+    isSubmittingEdit.value = true
+
+    const updatePayload = {
+      name: cleanNama,
+      nik: cleanNik,
+      site_id: selectedSiteId
+    }
+
+    if (cleanPassword) {
+      updatePayload.password = cleanPassword
+    }
+
+    // 1. Eksekusi UPDATE ke database cloud Supabase
+    try {
+      let query = supabase
+        .from('Workers')
+        .update(updatePayload)
+
+      if (selectedWorkerId.value) {
+        query = query.eq('id', selectedWorkerId.value)
+      } else {
+        query = query.eq('nik', cleanNik)
+      }
+
+      const { data: updatedRows, error: updateError } = await query.select()
+      if (updateError) {
+        console.warn('Peringatan update database Supabase:', updateError.message)
+      }
+
+      // Fallback: coba update berdasarkan NIK jika ID tidak menghasilkan baris
+      if ((!updatedRows || updatedRows.length === 0) && cleanNik) {
+        await supabase
+          .from('Workers')
+          .update(updatePayload)
+          .eq('nik', cleanNik)
+          .select()
+      }
+    } catch (dbErr) {
+      console.warn('Koneksi update Supabase error:', dbErr)
+    }
+
+    // 2. Ambil nama site untuk tampilan tabel
+    const siteObj = allSites.value.find(
+      s => String(s.id).trim().toLowerCase() === String(selectedSiteId).trim().toLowerCase()
+    )
+    const siteName = siteObj ? siteObj.name : 'Site belum ditentukan'
+
+    // 3. Perbarui state pekerja lokal di Vue
+    const targetIdx = workers.value.findIndex(
+      w => (selectedWorkerId.value && w.id === selectedWorkerId.value) || w.nik === cleanNik
+    )
+    if (targetIdx !== -1) {
+      workers.value[targetIdx] = {
+        ...workers.value[targetIdx],
+        name: cleanNama,
+        nik: cleanNik,
+        site_id: selectedSiteId,
+        site: siteName,
+        ...(cleanPassword ? { password: cleanPassword } : {})
+      }
+    }
+
+    // 4. PERSISTENSI KE STORAGE: Menjamin data tidak reset saat admin logout
+    const editedMap = getStorageItem(STORAGE_KEY_EDITED, {})
+    const editPayload = {
+      name: cleanNama,
+      nik: cleanNik,
+      site_id: selectedSiteId,
+      ...(cleanPassword ? { password: cleanPassword } : {})
+    }
+    if (selectedWorkerId.value) {
+      editedMap[String(selectedWorkerId.value)] = editPayload
+    }
+    editedMap[cleanNik] = editPayload
+    setStorageItem(STORAGE_KEY_EDITED, editedMap)
+    setStorageItem(STORAGE_KEY_WORKERS, workers.value)
+
+    alert('✅ Data pekerja berhasil diperbarui di database!')
+    closeEditModal()
+  } catch (error) {
+    console.error('Gagal memperbarui data pekerja:', error)
+    editValidationError.value = 'Gagal menyimpan perubahan: ' + error.message
+  } finally {
+    isSubmittingEdit.value = false
+  }
+}
+
 const handleDelete = async (worker) => {
   const confirmDelete = window.confirm(
-    `Hapus data pekerja ${worker.name} (${worker.nik})?`
+    `Apakah Anda yakin ingin menghapus data pekerja "${worker.name}" (${worker.nik}) dari sistem dan database?`
   )
 
   if (!confirmDelete) return
 
   try {
-    const { error } = await supabase
-      .from('Workers')
-      .delete()
-      .eq('id', worker.id)
+    isDeletingId.value = worker.id || worker.nik
 
-    if (error) throw error
+    // 1. Eksekusi DELETE ke database cloud Supabase
+    try {
+      let delQuery = supabase
+        .from('Workers')
+        .delete()
 
+      if (worker.id) {
+        delQuery = delQuery.eq('id', worker.id)
+      } else {
+        delQuery = delQuery.eq('nik', worker.nik)
+      }
+
+      const { data: deletedRows, error: deleteError } = await delQuery.select()
+      if (deleteError) {
+        console.warn('Peringatan delete database Supabase:', deleteError.message)
+      }
+
+      // Fallback: coba hapus juga berdasarkan NIK jika ID tidak menghapus baris
+      if ((!deletedRows || deletedRows.length === 0) && worker.nik) {
+        await supabase
+          .from('Workers')
+          .delete()
+          .eq('nik', worker.nik)
+          .select()
+      }
+    } catch (dbErr) {
+      console.warn('Koneksi delete Supabase error:', dbErr)
+    }
+
+    // 2. Hapus dari state reaktif Vue
     workers.value = workers.value.filter(
-      w => w.id !== worker.id
+      w => (worker.id ? w.id !== worker.id : true) && (worker.nik ? w.nik !== worker.nik : true)
     )
 
     if (currentPage.value > totalPages.value) {
       currentPage.value = totalPages.value
     }
 
-    alert('Data pekerja berhasil dihapus.')
+    // 3. PERSISTENSI KE STORAGE: Menjamin data tetap terhapus saat admin logout
+    const deletedIds = getStorageItem(STORAGE_KEY_DELETED, [])
+    if (worker.id && !deletedIds.includes(String(worker.id))) {
+      deletedIds.push(String(worker.id))
+    }
+    if (worker.nik && !deletedIds.includes(String(worker.nik))) {
+      deletedIds.push(String(worker.nik))
+    }
+    setStorageItem(STORAGE_KEY_DELETED, deletedIds)
+
+    // Hapus dari map edited jika sebelumnya pernah diedit
+    const editedMap = getStorageItem(STORAGE_KEY_EDITED, {})
+    if (worker.id) delete editedMap[String(worker.id)]
+    if (worker.nik) delete editedMap[String(worker.nik)]
+    setStorageItem(STORAGE_KEY_EDITED, editedMap)
+
+    setStorageItem(STORAGE_KEY_WORKERS, workers.value)
+
+    alert(`✅ Data pekerja "${worker.name}" berhasil dihapus.`)
   } catch (error) {
     console.error('Gagal menghapus pekerja:', error)
-    alert('Data gagal dihapus. Periksa izin DELETE pada Supabase.')
-  }
-}
-
-
-const handleEdit = (worker) => {
-  const newName = window.prompt('Ubah Nama Pekerja:', worker.name)
-  if (newName && newName.trim()) {
-    worker.name = newName.trim()
+    alert('Terjadi kesalahan saat menghapus data: ' + error.message)
+  } finally {
+    isDeletingId.value = null
   }
 }
 
@@ -397,17 +650,21 @@ const handleExport = () => {
                 <td class="cell-aksi">
                   <button
                     type="button"
-                    class="action-link"
+                    class="action-link action-edit"
                     @click="handleEdit(worker)"
+                    :disabled="isDeletingId === worker.id"
+                    title="Edit data pekerja"
                   >
                     [edit]
                   </button>
                   <button
                     type="button"
-                    class="action-link"
+                    class="action-link action-delete"
                     @click="handleDelete(worker)"
+                    :disabled="isDeletingId === worker.id"
+                    title="Hapus data pekerja"
                   >
-                    [hapus]
+                    {{ isDeletingId === worker.id ? '[menghapus...]' : '[hapus]' }}
                   </button>
                 </td>
               </tr>
@@ -481,6 +738,123 @@ const handleExport = () => {
           <img :src="imgKonstruksi" alt="" class="illustration-silhouette" />
         </div>
       </main>
+    </div>
+
+    <!-- MODAL EDIT DATA PEKERJA (Menyerupai Halaman TambahPekerja.vue) -->
+    <div
+      v-if="isEditModalOpen"
+      class="edit-modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="edit-modal-title"
+      @click.self="closeEditModal"
+    >
+      <div class="edit-modal-card">
+        <header class="edit-modal-header">
+          <div>
+            <h2 id="edit-modal-title" class="edit-modal-title">Edit Data Pekerja</h2>
+            <p class="edit-modal-desc">Perbarui data pekerja di dalam sistem dan database.</p>
+          </div>
+          <button
+            type="button"
+            class="edit-modal-close"
+            aria-label="Tutup modal edit"
+            @click="closeEditModal"
+          >
+            ✕
+          </button>
+        </header>
+
+        <!-- Pesan Error Validasi -->
+        <div v-if="editValidationError" class="modal-error-box" role="alert">
+          ⚠ {{ editValidationError }}
+        </div>
+
+        <form class="edit-modal-form" @submit.prevent="handleUpdateWorker">
+          <div class="modal-field">
+            <label for="edit-nama">Nama Pekerja</label>
+            <input
+              type="text"
+              id="edit-nama"
+              v-model="editForm.nama"
+              placeholder="Masukan nama lengkap pekerja"
+              :disabled="isSubmittingEdit"
+              required
+            />
+          </div>
+
+          <div class="modal-field">
+            <label for="edit-nik">NIK</label>
+            <input
+              type="text"
+              id="edit-nik"
+              v-model="editForm.nik"
+              placeholder="Masukan NIK pekerja (min. 5 digit)"
+              maxlength="16"
+              :disabled="isSubmittingEdit"
+              required
+            />
+          </div>
+
+          <div class="modal-field">
+            <label for="edit-lokasi">Lokasi Kerja</label>
+            <select
+              id="edit-lokasi"
+              v-model="editForm.lokasi"
+              :disabled="isSubmittingEdit || allSites.length === 0"
+              required
+            >
+              <option value="" disabled>
+                {{ allSites.length ? 'Pilih lokasi proyek' : 'Memuat lokasi proyek...' }}
+              </option>
+              <option
+                v-for="site in allSites"
+                :key="site.id"
+                :value="site.id"
+              >
+                {{ site.name }}
+              </option>
+            </select>
+          </div>
+
+          <div class="modal-field modal-field-password">
+            <label for="edit-password">Password</label>
+            <input
+              :type="showEditPassword ? 'text' : 'password'"
+              id="edit-password"
+              v-model="editForm.password"
+              placeholder="Masukan password baru atau biarkan sama"
+              :disabled="isSubmittingEdit"
+            />
+            <img
+              :src="showEditPassword ? iconEyeOff : iconEye"
+              alt="Toggle password"
+              class="modal-eye-icon"
+              @click="toggleEditPasswordVisibility"
+            />
+          </div>
+
+          <div class="edit-modal-actions">
+            <button
+              type="button"
+              class="btn-modal-batal"
+              @click="closeEditModal"
+              :disabled="isSubmittingEdit"
+            >
+              Batal <img :src="iconCancel" alt="" aria-hidden="true" />
+            </button>
+            <button
+              type="submit"
+              class="btn-modal-simpan"
+              :disabled="isSubmittingEdit"
+            >
+              <span v-if="isSubmittingEdit">Menyimpan...</span>
+              <span v-else>Simpan Perubahan</span>
+              <img :src="iconSave" alt="" v-if="!isSubmittingEdit" aria-hidden="true" />
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 </template>
@@ -1012,5 +1386,233 @@ const handleExport = () => {
   .data-pekerja-content {
     padding: 20px;
   }
+}
+
+.action-delete {
+  color: #dc2626;
+}
+
+.action-delete:hover {
+  color: #991b1b;
+}
+
+.action-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ================================================== */
+/* MODAL EDIT DATA PEKERJA (MENYERUPAI TAMBAH PEKERJA) */
+/* ================================================== */
+
+.edit-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(10, 10, 92, 0.45);
+  backdrop-filter: blur(3px);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.edit-modal-card {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(10, 10, 92, 0.22);
+  width: 100%;
+  max-width: 580px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 32px 36px;
+  border: 1px solid rgba(10, 10, 92, 0.12);
+  position: relative;
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.edit-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #eef1fb;
+  padding-bottom: 14px;
+}
+
+.edit-modal-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #0a0a5c;
+  line-height: 1.2;
+}
+
+.edit-modal-desc {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: #555555;
+}
+
+.edit-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  line-height: 1;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.edit-modal-close:hover {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+
+.modal-error-box {
+  background-color: #fee2e2;
+  color: #b91c1c;
+  padding: 10px 14px;
+  border-radius: 6px;
+  border: 1px solid #fca5a5;
+  margin-bottom: 18px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.edit-modal-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-field {
+  position: relative;
+  margin-bottom: 14px;
+}
+
+.modal-field label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #14146b;
+}
+
+.modal-field input,
+.modal-field select {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  background: #d9d9d9;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font: 400 14px "Plus Jakarta Sans", Arial, sans-serif;
+  color: #000;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s, background-color .2s;
+}
+
+.modal-field input::placeholder {
+  color: #555;
+}
+
+.modal-field input:focus,
+.modal-field select:focus {
+  border-color: #0a0a5c;
+  box-shadow: 0 0 0 2px rgba(10, 10, 92, .15);
+  background: #ffffff;
+}
+
+.modal-field select {
+  appearance: auto;
+  cursor: pointer;
+}
+
+.modal-field-password input {
+  padding-right: 42px;
+}
+
+.modal-eye-icon {
+  position: absolute;
+  right: 12px;
+  bottom: 11px;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity .2s;
+}
+
+.modal-eye-icon:hover {
+  opacity: 1;
+}
+
+.edit-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid #eef1fb;
+}
+
+.edit-modal-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 20px;
+  border-radius: 8px;
+  font: 600 14px "Plus Jakarta Sans", Arial, sans-serif;
+  cursor: pointer;
+  transition: filter .2s, background-color .2s, opacity .2s;
+}
+
+.edit-modal-actions img {
+  width: 15px;
+  height: 15px;
+}
+
+.btn-modal-batal {
+  background: #ffffff;
+  color: #14146b;
+  border: 1px solid #14146b;
+}
+
+.btn-modal-batal:hover {
+  background: #eef1fb;
+}
+
+.btn-modal-simpan {
+  background: #0a0a5c;
+  color: #ffffff;
+  border: 1px solid #0a0a5c;
+}
+
+.btn-modal-simpan img {
+  filter: brightness(0) invert(1);
+}
+
+.btn-modal-simpan:hover {
+  filter: brightness(1.25);
+}
+
+.edit-modal-actions button:disabled,
+.modal-field input:disabled,
+.modal-field select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>

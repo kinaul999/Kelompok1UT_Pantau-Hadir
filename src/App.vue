@@ -193,6 +193,7 @@ const handleAdminLogout = async () => {
     <!-- 4. HALAMAN SUKSES ABSENSI -->
     <AbsenSukses
       v-if="currentScreen === 'absen-sukses'"
+      :worker="loggedInWorker"
       @logout-trigger="handleWorkerLogout"
     />
 

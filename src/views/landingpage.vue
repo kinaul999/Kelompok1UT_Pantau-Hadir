@@ -1,6 +1,6 @@
 
 <script setup>
-import logo from '../assets/images/logo-pantau-hadir.svg'
+import logo from '../assets/images/logo-pantau-hadir.webp'
 import adminIcon from '../assets/icons/monitor-speaker.svg'
 import workerIcon from '../assets/icons/hard-hat.svg'
 
@@ -21,10 +21,14 @@ const handlePekerjaClick = () => {
     <!-- HEADER -->
     <header class="landing-header">
       <img
-        class="landing-logo"
-        :src="logo"
-        alt="Logo Pantau Hadir"
-      >
+  :src="logo"
+  alt="Logo Pantau Hadir"
+  class="landing-logo"
+  width="512"
+  height="512"
+  fetchpriority="high"
+  decoding="async"
+/>
 
       <h1>Pantau Hadir</h1>
 

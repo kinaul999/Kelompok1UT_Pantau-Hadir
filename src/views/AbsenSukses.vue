@@ -4,7 +4,7 @@ import { ref, computed, onMounted } from 'vue'
 import { supabase } from '../lib/supabase'
 
 import iconLogOut from '../assets/icons/log-out.svg'
-import logoPantauHadir from '../assets/images/logo-pantau-hadir.svg'
+import logoPantauHadir from '../assets/images/logo-pantau-hadir.webp'
 
 const props = defineProps({
   worker: {
@@ -360,12 +360,14 @@ onMounted(loadAttendanceHistory)
 
     <!-- FOOTER -->
     <footer class="success-footer">
-      <img
-        :src="logoPantauHadir"
-        alt="Logo Pantau Hadir"
-        class="brand-logo"
-      />
-    </footer>
+  <img
+    :src="logoPantauHadir"
+    alt="Logo Pantau Hadir"
+    class="brand-logo"
+    loading="lazy"
+    decoding="async"
+  />
+</footer>
 
   </div>
 </template>

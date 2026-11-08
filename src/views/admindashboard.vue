@@ -3,8 +3,8 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { supabase } from '../lib/supabase'
 
-import logo from '../assets/images/logo-pantau-hadir.svg'
-import constructionImage from '../assets/images/images-konstruksi-biru.jpg'
+import logo from '../assets/images/logo-pantau-hadir.webp'
+import constructionImage from '../assets/images/images-konstruksi-biru.webp'
 import hardHatIcon from '../assets/icons/hard-hat.svg'
 import checkIcon from '../assets/icons/circle-check.svg'
 import absentIcon from '../assets/icons/circle-x.svg'

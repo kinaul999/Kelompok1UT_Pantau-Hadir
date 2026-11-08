@@ -8,7 +8,7 @@ import iconHouse from '../assets/icons/house.svg'
 import iconEye from '../assets/icons/eye.svg'
 import iconEyeOff from '../assets/icons/eye-off.svg'
 import logoPantauHadir from '../assets/images/logo-pantau-hadir.svg'
-import imgKonstruksi from '../assets/images/images-konstruksi-biru-removebg-preview.png'
+import imgKonstruksi from '../assets/images/images-konstruksi-biru-removebg-preview.webp'
 
 const emit = defineEmits([
   'admin-login-success',

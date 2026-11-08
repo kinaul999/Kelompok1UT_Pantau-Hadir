@@ -4,7 +4,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { supabase } from '../lib/supabase'
 
 import logoPantauHadir from '../assets/images/logo-pantau-hadir.svg'
-import imgKonstruksi from '../assets/images/images-konstruksi-biru-removebg-preview.png'
+import imgKonstruksi from '../assets/images/images-konstruksi-biru-removebg-preview.webp'
 import iconLogOut from '../assets/icons/log-out.svg'
 import iconScanFace from '../assets/icons/scan-face.svg'
 import iconSquarePen from '../assets/icons/square-pen.svg'

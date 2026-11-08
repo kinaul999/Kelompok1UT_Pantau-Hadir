@@ -8,7 +8,7 @@ import iconLogIn from '../assets/icons/log-in.svg'
 import iconEye from '../assets/icons/eye.svg'
 import iconEyeOff from '../assets/icons/eye-off.svg'
 import logoPantauHadir from '../assets/images/logo-pantau-hadir.svg'
-import imgKonstruksi from '../assets/images/images-konstruksi-biru.jpg'
+import imgKonstruksi from '../assets/images/images-konstruksi-biru-removebg-preview.webp'
 
 const nik = ref('')
 const kataSandi = ref('')
@@ -273,14 +273,16 @@ const handleLogin = async () => {
     </main>
 
     <footer class="illustration-footer text-center">
-      <img
-        :src="imgKonstruksi"
-        alt="Ilustrasi Konstruksi Pantau Hadir"
-        width="400"
-        height="200"
-        class="footer-img"
-      />
-    </footer>
+  <img
+    :src="imgKonstruksi"
+    alt="Ilustrasi Konstruksi Pantau Hadir"
+    width="400"
+    height="200"
+    class="footer-img"
+    loading="lazy"
+    decoding="async"
+  />
+</footer>
   </div>
 </template>
 

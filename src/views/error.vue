@@ -1,8 +1,8 @@
 <script setup>
-import logo from '../assets/images/logo-pantau-hadir.svg'
+import logo from '../assets/images/logo-pantau-hadir.webp'
 import errorIcon from '../assets/icons/error.svg'
 import homeIcon from '../assets/icons/house.svg'
-import constructionImage from '../assets/images/images-konstruksi-biru.jpg'
+import constructionImage from '../assets/images/images-konstruksi-biru.webp'
 </script>
 
 <template>

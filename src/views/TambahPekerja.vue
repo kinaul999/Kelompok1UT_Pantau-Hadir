@@ -503,8 +503,8 @@ const handleSubmit = async () => {
   pointer-events: none;
 
   background-image:
-    url("../assets/images/images-konstruksi-biru.jpg");
-
+    url("../assets/images/images-konstruksi-biru.webp");
+    
   background-repeat: no-repeat;
   background-position: center bottom;
   background-size: 100% auto;
